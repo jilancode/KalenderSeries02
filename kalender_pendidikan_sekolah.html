@@ -1,0 +1,2826 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalender Pendidikan Sekolah</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- SheetJS for Excel Export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- html2pdf.js for Direct PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#2563eb',
+              600: '#1d4ed8',
+              800: '#1e40af',
+              900: '#0f172a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Print Specific Styling */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-area, #print-area * {
+        visibility: visible;
+      }
+      #print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: white;
+        padding: 20px;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .page-break {
+        page-break-after: always;
+      }
+    }
+
+    /* Standard Calendar Grid Minimum Heights */
+    .day-cell {
+      min-height: 95px;
+    }
+    @media (max-width: 640px) {
+      .day-cell {
+        min-height: 65px;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen flex flex-col md:flex-row">
+
+  <!-- ==================== SIDEBAR NAV ==================== -->
+  <aside id="sidebar" class="w-full md:w-64 bg-slate-900 text-white flex-shrink-0 flex flex-col justify-between transition-all duration-300 z-30">
+    <div>
+      <!-- App Header -->
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-indigo-500/30">
+            <i class="fa-solid font-bold text-lg fa-calendar-days"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-sm tracking-wide leading-tight text-white">KALDIK SEKOLAH</h1>
+            <p class="text-xs text-slate-400">Sekolah Dasar (SD)</p>
+          </div>
+        </div>
+        <button id="mobile-menu-toggle" class="md:hidden text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-bars text-xl"></i>
+        </button>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav id="nav-links" class="p-3 space-y-1 hidden md:block">
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-indigo-600 text-white">
+          <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+          <span>Dashboard</span>
+        </button>
+        <button onclick="switchTab('kalender')" id="nav-kalender" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-calendar-days w-5 text-center"></i>
+          <span>Kalender Master</span>
+        </button>
+        
+        <div class="pt-3 pb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Kategori Agenda</div>
+        
+        <button onclick="switchTab('holidays')" id="nav-holidays" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800 hover:text-white">
+          <div class="flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+            <span>Libur Nasional</span>
+          </div>
+          <span id="badge-holidays" class="bg-rose-950 text-rose-300 text-xs px-2 py-0.5 rounded-full font-mono">0</span>
+        </button>
+
+        <button onclick="switchTab('school-agenda')" id="nav-school-agenda" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800 hover:text-white">
+          <div class="flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+            <span>Agenda Sekolah</span>
+          </div>
+          <span id="badge-school" class="bg-sky-950 text-sky-300 text-xs px-2 py-0.5 rounded-full font-mono">0</span>
+        </button>
+
+        <button onclick="switchTab('teacher-agenda')" id="nav-teacher-agenda" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800 hover:text-white">
+          <div class="flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+            <span>Agenda Guru</span>
+          </div>
+          <span id="badge-teacher" class="bg-purple-950 text-purple-300 text-xs px-2 py-0.5 rounded-full font-mono">0</span>
+        </button>
+
+        <button onclick="switchTab('events')" id="nav-events" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800 hover:text-white">
+          <div class="flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <span>Peristiwa Penting</span>
+          </div>
+          <span id="badge-events" class="bg-amber-950 text-amber-300 text-xs px-2 py-0.5 rounded-full font-mono">0</span>
+        </button>
+
+        <div class="pt-3 pb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Laporan & Analisis</div>
+
+        <button onclick="switchTab('rekap')" id="nav-rekap" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-file-contract w-5 text-center"></i>
+          <span>Rekap Agenda</span>
+        </button>
+
+        <button onclick="switchTab('heb')" id="nav-heb" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-calculator w-5 text-center"></i>
+          <span>Hari Efektif (HEB)</span>
+        </button>
+
+        <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:bg-slate-800 hover:text-white">
+          <i class="fa-solid fa-sliders w-5 text-center"></i>
+          <span>Pengaturan</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Active Academic Year Box -->
+    <div class="p-4 border-t border-slate-800 hidden md:block">
+      <div class="bg-slate-800/80 rounded-lg p-3 text-xs border border-slate-700/50">
+        <div class="text-slate-400 flex items-center justify-between mb-1">
+          <span>Tahun Pelajaran</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        </div>
+        <div id="sidebar-tp-display" class="font-bold text-white text-sm">2024/2025</div>
+        <div id="sidebar-school-display" class="text-slate-400 text-[11px] truncate mt-1">SD Negeri Harapan Bangsa 01</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ==================== MAIN CONTENT ==================== -->
+  <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <!-- Topbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm px-4 py-3 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <button onclick="toggleMobileMenu()" class="md:hidden text-slate-600 hover:text-slate-900 p-1">
+          <i class="fa-solid fa-bars text-xl"></i>
+        </button>
+        <div>
+          <h2 id="page-title" class="text-lg font-bold text-slate-800 leading-tight">Dashboard</h2>
+          <p id="page-subtitle" class="text-xs text-slate-500">Ringkasan Kalender Pendidikan & Agenda Sekolah</p>
+        </div>
+      </div>
+
+      <!-- Controls: Active Semester & Quick Actions -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Semester Switcher -->
+        <div class="bg-slate-100 p-1 rounded-lg flex items-center border border-slate-200 text-xs font-medium">
+          <button onclick="setActiveSemester(1)" id="sem-btn-1" class="px-3 py-1.5 rounded-md transition-all font-semibold bg-white text-indigo-600 shadow-sm">
+            Sem 1 (Ganjil)
+          </button>
+          <button onclick="setActiveSemester(2)" id="sem-btn-2" class="px-3 py-1.5 rounded-md transition-all text-slate-600 hover:text-slate-900">
+            Sem 2 (Genap)
+          </button>
+        </div>
+
+        <!-- Add Event Quick Button -->
+        <button onclick="openAgendaModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
+          <i class="fa-solid fa-plus"></i>
+          <span class="hidden sm:inline">Tambah Agenda</span>
+        </button>
+
+        <!-- Print Dialog Trigger -->
+        <button onclick="openPrintModal()" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
+          <i class="fa-solid fa-print"></i>
+          <span class="hidden sm:inline">Cetak / PDF</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- TAB CONTAINER -->
+    <div class="p-4 sm:p-6 space-y-6 flex-1">
+
+      <!-- 1. DASHBOARD TAB -->
+      <section id="tab-dashboard" class="tab-content space-y-6">
+        <!-- School Identity Header Banner -->
+        <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-md border border-slate-800 relative overflow-hidden">
+          <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+              <!-- Logo Kabupaten (Kiri) Banner Preview -->
+              <div id="banner-logo-left-box" class="w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 bg-white/10 backdrop-blur-md rounded-xl p-1.5 flex items-center justify-center border border-white/20 hidden">
+                <img id="banner-logo-left" src="" alt="Logo Kabupaten" class="max-w-full max-h-full object-contain">
+              </div>
+              <div class="space-y-1">
+                <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs border border-indigo-500/30 font-medium mb-1">
+                  <i class="fa-solid fa-graduation-cap"></i>
+                  <span id="banner-school-npsn">NPSN: 20109988</span>
+                </div>
+                <h2 id="banner-school-name" class="text-xl sm:text-2xl font-extrabold text-white">SD NEGERI HARAPAN BANGSA 01</h2>
+                <p id="banner-school-address" class="text-xs sm:text-sm text-slate-300">Jl. Pendidikan No. 45, Kecamatan Kota, Kabupaten Bandung</p>
+              </div>
+            </div>
+            
+            <div class="flex items-center gap-4 self-start md:self-auto">
+              <!-- Logo Sekolah (Kanan) Banner Preview -->
+              <div id="banner-logo-right-box" class="w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 bg-white/10 backdrop-blur-md rounded-xl p-1.5 flex items-center justify-center border border-white/20 hidden">
+                <img id="banner-logo-right" src="" alt="Logo Sekolah" class="max-w-full max-h-full object-contain">
+              </div>
+              <div class="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/10 flex items-center gap-4">
+                <div class="text-center px-2">
+                  <div class="text-[10px] uppercase text-indigo-200 font-semibold tracking-wider">Tahun Pelajaran</div>
+                  <div id="banner-tp" class="text-lg font-bold text-white">2024/2025</div>
+                </div>
+                <div class="w-px h-8 bg-white/20"></div>
+                <div class="text-center px-2">
+                  <div class="text-[10px] uppercase text-indigo-200 font-semibold tracking-wider">Semester Aktif</div>
+                  <div id="banner-sem" class="text-lg font-bold text-emerald-400">Semester 1 (Ganjil)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Statistics Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
+          <!-- Total Agenda Card -->
+          <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between text-slate-500 mb-2">
+              <span class="text-xs font-medium">Total Agenda</span>
+              <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+                <i class="fa-solid fa-list-check text-sm"></i>
+              </div>
+            </div>
+            <div id="stat-total-agenda" class="text-2xl font-bold text-slate-800">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">Keseluruhan entri</div>
+          </div>
+
+          <!-- Libur Nasional Card -->
+          <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between text-rose-600 mb-2">
+              <span class="text-xs font-medium">Libur Nasional</span>
+              <div class="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
+                <i class="fa-solid fa-calendar-xmark text-sm"></i>
+              </div>
+            </div>
+            <div id="stat-holidays" class="text-2xl font-bold text-rose-600">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">Hari libur resmi</div>
+          </div>
+
+          <!-- Agenda Sekolah Card -->
+          <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between text-sky-600 mb-2">
+              <span class="text-xs font-medium">Agenda Sekolah</span>
+              <div class="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600">
+                <i class="fa-solid fa-school text-sm"></i>
+              </div>
+            </div>
+            <div id="stat-school" class="text-2xl font-bold text-sky-600">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">Kegiatan institusi</div>
+          </div>
+
+          <!-- Agenda Guru Card -->
+          <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between text-purple-600 mb-2">
+              <span class="text-xs font-medium">Agenda Guru</span>
+              <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                <i class="fa-solid fa-chalkboard-user text-sm"></i>
+              </div>
+            </div>
+            <div id="stat-teacher" class="text-2xl font-bold text-purple-600">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">Kombel & Pelatihan</div>
+          </div>
+
+          <!-- Peristiwa Penting Card -->
+          <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between text-amber-600 mb-2">
+              <span class="text-xs font-medium">Peristiwa Penting</span>
+              <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                <i class="fa-solid fa-star text-sm"></i>
+              </div>
+            </div>
+            <div id="stat-events" class="text-2xl font-bold text-amber-600">0</div>
+            <div class="text-[11px] text-slate-500 mt-1">Hari besar & momen</div>
+          </div>
+
+          <!-- Hari Efektif Belajar Card -->
+          <div class="bg-white rounded-xl p-4 border border-emerald-200 bg-emerald-50/30 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between text-emerald-700 mb-2">
+              <span class="text-xs font-semibold">Total HEB Active</span>
+              <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">
+                <i class="fa-solid fa-calculator text-sm"></i>
+              </div>
+            </div>
+            <div id="stat-heb-semester" class="text-2xl font-extrabold text-emerald-700">0</div>
+            <div class="text-[11px] text-emerald-600 font-medium mt-1">Hari belajar efektif</div>
+          </div>
+        </div>
+
+        <!-- Dashboard Main Grid: Calendar Widget & Upcoming Events -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Calendar Column (2 Cols) -->
+          <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 flex flex-col">
+            <!-- Calendar Navigation Header -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+              <div class="flex items-center gap-3">
+                <h3 id="cal-month-title" class="text-lg font-bold text-slate-800">Juli 2024</h3>
+                <span id="cal-sem-tag" class="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">Semester 1</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="navigateMonth(-1)" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition text-xs">
+                  <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <button onclick="goToCurrentMonth()" class="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition">
+                  Hari Ini
+                </button>
+                <button onclick="navigateMonth(1)" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition text-xs">
+                  <i class="fa-solid fa-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Category Color Legend Key -->
+            <div class="flex flex-wrap items-center gap-3 mb-4 text-xs">
+              <div class="flex items-center gap-1.5">
+                <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+                <span class="text-slate-600">Libur Nasional</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-3 h-3 rounded-full bg-sky-500 inline-block"></span>
+                <span class="text-slate-600">Agenda Sekolah</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-3 h-3 rounded-full bg-purple-500 inline-block"></span>
+                <span class="text-slate-600">Agenda Guru</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+                <span class="text-slate-600">Peristiwa Penting</span>
+              </div>
+            </div>
+
+            <!-- Calendar Grid Element -->
+            <div id="dashboard-calendar-container" class="w-full">
+              <!-- Dynamically Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Side Column: Upcoming Agenda & Today Highlights -->
+          <div class="space-y-6">
+            <!-- Today Status Card -->
+            <div class="bg-gradient-to-br from-indigo-50 to-slate-50 rounded-2xl border border-indigo-100 p-4 sm:p-5 shadow-sm">
+              <div class="flex items-center justify-between mb-3">
+                <div class="text-xs font-bold uppercase tracking-wider text-indigo-700">Tanggal Hari Ini</div>
+                <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-medium" id="today-date-badge">--/--/----</span>
+              </div>
+              <div class="text-2xl font-extrabold text-slate-900" id="today-day-name">Senin</div>
+              <div class="text-sm text-slate-500 font-medium" id="today-full-text">15 Juli 2024</div>
+              
+              <div class="mt-4 pt-3 border-t border-indigo-100/80">
+                <div class="text-xs font-semibold text-slate-700 mb-2">Kegiatan Hari Ini:</div>
+                <div id="today-activities-list" class="space-y-2">
+                  <!-- Populated by JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Upcoming Agendas List Card -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="font-bold text-slate-800 text-sm">Agenda Mendatang</h4>
+                <button onclick="switchTab('rekap')" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Lihat Semua</button>
+              </div>
+              <div id="upcoming-agenda-list" class="space-y-3">
+                <!-- Dynamically Populated -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- 2. KALENDER MASTER TAB (FULL & SEMESTER VIEW) -->
+      <section id="tab-kalender" class="tab-content space-y-6 hidden">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 class="text-lg font-bold text-slate-800">Kalender Pendidikan Interaktif</h3>
+              <p class="text-xs text-slate-500">Tampilan penuh per bulan & matriks semester lengkap</p>
+            </div>
+            <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-lg text-xs font-medium border border-slate-200">
+              <button onclick="setCalendarMode('month')" id="cal-mode-month" class="px-3 py-1.5 rounded-md transition font-semibold bg-white text-indigo-600 shadow-sm">
+                Tampilan Bulanan
+              </button>
+              <button onclick="setCalendarMode('semester')" id="cal-mode-semester" class="px-3 py-1.5 rounded-md transition text-slate-600 hover:text-slate-900">
+                Matriks Semester (6 Bulan)
+              </button>
+            </div>
+          </div>
+
+          <!-- Month Mode Navigation -->
+          <div id="full-month-header" class="flex items-center justify-between mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <button onclick="navigateMonth(-1)" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-medium">
+              <i class="fa-solid fa-chevron-left mr-1"></i> Bulan Sebelumnya
+            </button>
+            <h3 id="full-cal-month-title" class="text-base font-bold text-slate-800">Juli 2024</h3>
+            <button onclick="navigateMonth(1)" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-medium">
+              Bulan Berikutnya <i class="fa-solid fa-chevron-right ml-1"></i>
+            </button>
+          </div>
+
+          <!-- Full Calendar Grid Area -->
+          <div id="full-calendar-render-area">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </section>
+
+
+      <!-- 3. LIBUR NASIONAL TAB -->
+      <section id="tab-holidays" class="tab-content space-y-6 hidden">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+                <h3 class="text-lg font-bold text-slate-800">Hari Libur Nasional & Cuti Bersama</h3>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">Pengelolaan data libur resmi nasional untuk kalender pendidikan</p>
+            </div>
+            <button onclick="openAgendaModal('holiday')" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Tambah Hari Libur
+            </button>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead class="bg-slate-50 text-slate-700 text-xs uppercase font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">Tanggal / Rentang</th>
+                  <th class="py-3 px-4">Nama Hari Libur</th>
+                  <th class="py-3 px-4">Keterangan</th>
+                  <th class="py-3 px-4 text-center">Durasi</th>
+                  <th class="py-3 px-4 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="table-holidays-body" class="divide-y divide-slate-200 text-slate-700">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- 4. AGENDA SEKOLAH TAB -->
+      <section id="tab-school-agenda" class="tab-content space-y-6 hidden">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-sky-500"></span>
+                <h3 class="text-lg font-bold text-slate-800">Agenda & Kegiatan Sekolah</h3>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">Kegiatan akademik, ujian, pembagian rapor, dan libur semester</p>
+            </div>
+            <button onclick="openAgendaModal('school')" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Tambah Agenda Sekolah
+            </button>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead class="bg-slate-50 text-slate-700 text-xs uppercase font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">Tanggal / Waktu</th>
+                  <th class="py-3 px-4">Nama Kegiatan</th>
+                  <th class="py-3 px-4">Tempat / PIC</th>
+                  <th class="py-3 px-4">Status Efektif</th>
+                  <th class="py-3 px-4 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="table-school-body" class="divide-y divide-slate-200 text-slate-700">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- 5. AGENDA GURU TAB -->
+      <section id="tab-teacher-agenda" class="tab-content space-y-6 hidden">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-purple-500"></span>
+                <h3 class="text-lg font-bold text-slate-800">Agenda Guru & Tenaga Kependidikan</h3>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">Rapat dinas, workshop, KKG/MGMP, dan pengembangan profesionalisme</p>
+            </div>
+            <button onclick="openAgendaModal('teacher')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Tambah Agenda Guru
+            </button>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead class="bg-slate-50 text-slate-700 text-xs uppercase font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">Tanggal / Waktu</th>
+                  <th class="py-3 px-4">Nama Kegiatan</th>
+                  <th class="py-3 px-4">Peserta / Guru</th>
+                  <th class="py-3 px-4">Penanggung Jawab</th>
+                  <th class="py-3 px-4 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="table-teacher-body" class="divide-y divide-slate-200 text-slate-700">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- 6. PERISTIWA PENTING TAB -->
+      <section id="tab-events" class="tab-content space-y-6 hidden">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                <h3 class="text-lg font-bold text-slate-800">Peristiwa Penting & Peringatan</h3>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">Hari Besar Nasional, Peringatan Pendidikan, dan momentum penting sekolah</p>
+            </div>
+            <button onclick="openAgendaModal('important')" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-plus"></i> Tambah Peristiwa
+            </button>
+          </div>
+
+          <!-- Table -->
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table class="w-full text-left border-collapse text-sm">
+              <thead class="bg-slate-50 text-slate-700 text-xs uppercase font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">Tanggal</th>
+                  <th class="py-3 px-4">Nama Peristiwa / Peringatan</th>
+                  <th class="py-3 px-4">Keterangan</th>
+                  <th class="py-3 px-4 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="table-events-body" class="divide-y divide-slate-200 text-slate-700">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- 7. REKAP AGENDA TAB -->
+      <section id="tab-rekap" class="tab-content space-y-6 hidden">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 class="text-lg font-bold text-slate-800">Rekapitulasi Agenda & Kegiatan</h3>
+              <p class="text-xs text-slate-500">Filter, analisis, dan ekspor laporan kegiatan akademik lengkap</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="exportRekapExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition">
+                <i class="fa-solid fa-file-excel"></i> Ekspor Excel
+              </button>
+              <button onclick="printRekapReport()" class="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition">
+                <i class="fa-solid fa-print"></i> Cetak Rekap
+              </button>
+            </div>
+          </div>
+
+          <!-- Filters Bar -->
+          <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Kategori</label>
+              <select id="rekap-filter-cat" onchange="renderRekapTable()" class="w-full text-xs rounded-lg border-slate-300 bg-white p-2 border focus:ring-2 focus:ring-indigo-500">
+                <option value="all">-- Semua Kategori --</option>
+                <option value="holiday">Hari Libur Nasional</option>
+                <option value="school">Agenda Sekolah</option>
+                <option value="teacher">Agenda Guru</option>
+                <option value="important">Peristiwa Penting</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Semester</label>
+              <select id="rekap-filter-sem" onchange="renderRekapTable()" class="w-full text-xs rounded-lg border-slate-300 bg-white p-2 border focus:ring-2 focus:ring-indigo-500">
+                <option value="all">-- Semua Semester --</option>
+                <option value="1">Semester 1 (Ganjil)</option>
+                <option value="2">Semester 2 (Genap)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Bulan Spesiﬁk</label>
+              <select id="rekap-filter-month" onchange="renderRekapTable()" class="w-full text-xs rounded-lg border-slate-300 bg-white p-2 border focus:ring-2 focus:ring-indigo-500">
+                <option value="all">-- Semua Bulan --</option>
+                <option value="0">Januari</option>
+                <option value="1">Februari</option>
+                <option value="2">Maret</option>
+                <option value="3">April</option>
+                <option value="4">Mei</option>
+                <option value="5">Juni</option>
+                <option value="6">Juli</option>
+                <option value="7">Agustus</option>
+                <option value="8">September</option>
+                <option value="9">Oktober</option>
+                <option value="10">November</option>
+                <option value="11">Desember</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Cari Kata Kunci</label>
+              <div class="relative">
+                <input type="text" id="rekap-search-input" onkeyup="renderRekapTable()" placeholder="Nama kegiatan / PIC..." class="w-full text-xs rounded-lg border-slate-300 bg-white p-2 pl-8 border focus:ring-2 focus:ring-indigo-500">
+                <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-xs"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary Bar -->
+          <div class="flex items-center justify-between text-xs text-slate-600 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 mb-4">
+            <div>
+              Menampilkan <span id="rekap-count-display" class="font-bold text-indigo-700">0</span> item agenda sesuai filter
+            </div>
+            <button onclick="resetRekapFilters()" class="text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1">
+              <i class="fa-solid fa-rotate-left"></i> Reset Filter
+            </button>
+          </div>
+
+          <!-- Data Table -->
+          <div class="overflow-x-auto border border-slate-200 rounded-xl">
+            <table id="rekap-main-table" class="w-full text-left border-collapse text-sm">
+              <thead class="bg-slate-50 text-slate-700 text-xs uppercase font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="py-3 px-4">No</th>
+                  <th class="py-3 px-4">Kategori</th>
+                  <th class="py-3 px-4">Tanggal / Waktu</th>
+                  <th class="py-3 px-4">Nama Kegiatan</th>
+                  <th class="py-3 px-4">Tempat / PIC</th>
+                  <th class="py-3 px-4">Keterangan</th>
+                </tr>
+              </thead>
+              <tbody id="rekap-table-body" class="divide-y divide-slate-200 text-slate-700">
+                <!-- Rendered by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- 8. HARI EFEKTIF BELAJAR (HEB) TAB -->
+      <section id="tab-heb" class="tab-content space-y-6 hidden">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 class="text-lg font-bold text-slate-800">Perhitungan Hari Efektif Belajar (HEB)</h3>
+              <p class="text-xs text-slate-500">Kalkulasi otomatis hari belajar (Senin-Jumat) dikurangi libur nasional & libur sekolah</p>
+            </div>
+            <button onclick="printHEBReport()" class="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition">
+              <i class="fa-solid fa-print"></i> Cetak Analisis HEB
+            </button>
+          </div>
+
+          <!-- Formula Info Card -->
+          <div class="bg-blue-50/70 border border-blue-200 rounded-xl p-4 text-xs text-slate-700 space-y-1.5 mb-6">
+            <div class="font-bold text-blue-900 flex items-center gap-2">
+              <i class="fa-solid fa-circle-info text-blue-600"></i> Ketentuan & Formula Perhitungan HEB:
+            </div>
+            <ul class="list-disc list-inside space-y-1 text-slate-600 pl-1">
+              <li>Hari Kerja Standar: <strong>Senin - Jumat</strong> (Sabtu & Minggu tidak dihitung sebagai hari efektif).</li>
+              <li>Hari Libur Nasional & Cuti Bersama yang jatuh pada hari kerja otomatis memotong HEB.</li>
+              <li>Agenda Sekolah yang ditandai sebagai <em>"Hari Tidak Efektif"</em> (misal Libur Semester, MPLS) memotong HEB.</li>
+              <li>Jumlah HEB dapat disesuaikan manual (override) jika terdapat dispensasi atau penyesuaian edaran dinas.</li>
+            </ul>
+          </div>
+
+          <!-- HEB Breakdown Matrix Tables -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Semester 1 Matrix -->
+            <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div class="bg-slate-800 text-white px-4 py-3 font-bold text-sm flex justify-between items-center">
+                <span>Semester 1 (Ganjil)</span>
+                <span id="heb-sem1-total-badge" class="bg-indigo-500 text-white text-xs px-2.5 py-0.5 rounded-full">0 Hari HEB</span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead class="bg-slate-100 text-slate-700 uppercase font-semibold border-b border-slate-200">
+                    <tr>
+                      <th class="py-2.5 px-3">Bulan</th>
+                      <th class="py-2.5 px-2 text-center">Hari Kerja</th>
+                      <th class="py-2.5 px-2 text-center">Libur Nas.</th>
+                      <th class="py-2.5 px-2 text-center">Non-Efektif</th>
+                      <th class="py-2.5 px-3 text-center bg-indigo-50 text-indigo-900 font-bold">Total HEB</th>
+                      <th class="py-2.5 px-2 text-center">Penyesuaian</th>
+                    </tr>
+                  </thead>
+                  <tbody id="heb-sem1-body" class="divide-y divide-slate-200 text-slate-700">
+                    <!-- Populated by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Semester 2 Matrix -->
+            <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div class="bg-slate-800 text-white px-4 py-3 font-bold text-sm flex justify-between items-center">
+                <span>Semester 2 (Genap)</span>
+                <span id="heb-sem2-total-badge" class="bg-emerald-500 text-white text-xs px-2.5 py-0.5 rounded-full">0 Hari HEB</span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead class="bg-slate-100 text-slate-700 uppercase font-semibold border-b border-slate-200">
+                    <tr>
+                      <th class="py-2.5 px-3">Bulan</th>
+                      <th class="py-2.5 px-2 text-center">Hari Kerja</th>
+                      <th class="py-2.5 px-2 text-center">Libur Nas.</th>
+                      <th class="py-2.5 px-2 text-center">Non-Efektif</th>
+                      <th class="py-2.5 px-3 text-center bg-emerald-50 text-emerald-900 font-bold">Total HEB</th>
+                      <th class="py-2.5 px-2 text-center">Penyesuaian</th>
+                    </tr>
+                  </thead>
+                  <tbody id="heb-sem2-body" class="divide-y divide-slate-200 text-slate-700">
+                    <!-- Populated by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Total Annual Summary -->
+          <div class="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-xl p-5 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md">
+            <div>
+              <div class="text-xs text-indigo-300 uppercase font-semibold">Total Hari Efektif Belajar (HEB) 1 Tahun Pelajaran</div>
+              <div class="text-slate-300 text-xs mt-0.5" id="heb-annual-detail-text">Semester 1 + Semester 2</div>
+            </div>
+            <div class="text-3xl font-extrabold text-emerald-400 font-mono" id="heb-annual-total-display">
+              0 <span class="text-base font-sans font-normal text-slate-300">Hari</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- 9. PENGATURAN TAB -->
+      <section id="tab-settings" class="tab-content space-y-6 hidden">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm">
+          <h3 class="text-lg font-bold text-slate-800 mb-1">Pengaturan Aplikasi & Identitas Sekolah</h3>
+          <p class="text-xs text-slate-500 mb-6">Konfigurasi profile sekolah, rentang semester, dan manajemen cadangan data</p>
+
+          <form id="settings-form" onsubmit="saveSettings(event)" class="space-y-6 max-w-4xl">
+            <!-- School Profile Section -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+              <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-school text-indigo-600"></i> Identitas Sekolah & Logo Header Kop
+              </h4>
+
+              <!-- Logo Upload Fields (Kiri & Kanan Kop) -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-white rounded-xl border border-slate-200">
+                <!-- Logo Kabupaten (Kiri) -->
+                <div class="space-y-2">
+                  <label class="block font-semibold text-slate-700 text-xs">
+                    <i class="fa-solid fa-image text-indigo-600 mr-1"></i> Logo Kabupaten / Pemda (Sebelah Kiri Kop)
+                  </label>
+                  <div class="flex items-center gap-3">
+                    <div id="preview-logo-left-container" class="w-16 h-16 rounded-lg border border-slate-300 bg-slate-50 p-1 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <img id="preview-logo-left" src="" alt="Logo Kiri" class="max-w-full max-h-full object-contain">
+                    </div>
+                    <div class="space-y-1.5 flex-1">
+                      <label class="inline-block bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-lg border border-indigo-200 cursor-pointer transition">
+                        <i class="fa-solid fa-upload mr-1"></i> Pilih Logo Kiri
+                        <input type="file" accept="image/*" onchange="handleLogoUpload(event, 'left')" class="hidden">
+                      </label>
+                      <button type="button" onclick="removeLogo('left')" class="block text-[11px] text-rose-600 hover:underline">Hapus Logo Kiri</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Logo Sekolah (Kanan) -->
+                <div class="space-y-2">
+                  <label class="block font-semibold text-slate-700 text-xs">
+                    <i class="fa-solid fa-image text-indigo-600 mr-1"></i> Logo Sekolah (Sebelah Kanan Kop)
+                  </label>
+                  <div class="flex items-center gap-3">
+                    <div id="preview-logo-right-container" class="w-16 h-16 rounded-lg border border-slate-300 bg-slate-50 p-1 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <img id="preview-logo-right" src="" alt="Logo Kanan" class="max-w-full max-h-full object-contain">
+                    </div>
+                    <div class="space-y-1.5 flex-1">
+                      <label class="inline-block bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-lg border border-indigo-200 cursor-pointer transition">
+                        <i class="fa-solid fa-upload mr-1"></i> Pilih Logo Kanan
+                        <input type="file" accept="image/*" onchange="handleLogoUpload(event, 'right')" class="hidden">
+                      </label>
+                      <button type="button" onclick="removeLogo('right')" class="block text-[11px] text-rose-600 hover:underline">Hapus Logo Kanan</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Nama Sekolah</label>
+                  <input type="text" id="set-school-name" required class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">NPSN / Identitas</label>
+                  <input type="text" id="set-school-npsn" required class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Nama Kepala Sekolah</label>
+                  <input type="text" id="set-principal-name" required class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">NIP Kepala Sekolah</label>
+                  <input type="text" id="set-principal-nip" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="block font-semibold text-slate-700 mb-1">Alamat Sekolah</label>
+                  <input type="text" id="set-school-address" required class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+              </div>
+            </div>
+
+            <!-- Academic Year & Semester Bounds -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+              <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-calendar-range text-indigo-600"></i> Tahun Pelajaran & Rentang Semester
+              </h4>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Tahun Pelajaran</label>
+                  <input type="text" id="set-tp" required placeholder="Contoh: 2024/2025" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Tanggal Mulai Semester 1</label>
+                  <input type="date" id="set-sem1-start" required class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Tanggal Akhir Semester 1</label>
+                  <input type="date" id="set-sem1-end" required class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Tanggal Mulai Semester 2</label>
+                  <input type="date" id="set-sem2-start" required class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Tanggal Akhir Semester 2</label>
+                  <input type="date" id="set-sem2-end" required class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+              </div>
+            </div>
+
+            <!-- Tim Pengembang & Tanda Tangan Dokumen -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+              <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-user-pen text-indigo-600"></i> Tim Pengembang & Tanda Tangan Dokumen
+              </h4>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Kota / Tempat Penetapan</label>
+                  <input type="text" id="set-city-name" required placeholder="Contoh: Bandung" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Jabatan / Tim Pengembang</label>
+                  <input type="text" id="set-dev-role" required placeholder="Contoh: Tim Pengembang Kurikulum" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Nama Pengembang / Ketua Panitia</label>
+                  <input type="text" id="set-dev-name" required placeholder="Contoh: Panitia Kalender Pendidikan" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">NIP / NUPTK Pengembang (Opsional)</label>
+                  <input type="text" id="set-dev-nip" placeholder="Contoh: 19820315 200801 1 003" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Tanggal Penetapan Dokumen (Opsional)</label>
+                  <input type="date" id="set-sign-date" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 bg-white">
+                  <p class="text-[10px] text-slate-400 mt-1">*Kosongkan untuk menggunakan tanggal hari ini</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Save Settings Submit -->
+            <div class="flex justify-end">
+              <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Pengaturan
+              </button>
+            </div>
+          </form>
+
+          <hr class="my-8 border-slate-200">
+
+          <!-- Backup, Restore & Reset Section -->
+          <div class="space-y-4 max-w-4xl">
+            <h4 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <i class="fa-solid fa-database text-indigo-600"></i> Pengelolaan Data Backup & Restore
+            </h4>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <!-- Export JSON -->
+              <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
+                <div>
+                  <div class="font-bold text-xs text-slate-800">Cadangkan Data (JSON)</div>
+                  <p class="text-[11px] text-slate-500 mt-1">Unduh seluruh file data kalender & agenda untuk disimpan aman.</p>
+                </div>
+                <button onclick="backupJSON()" class="mt-4 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-download"></i> Unduh Backup JSON
+                </button>
+              </div>
+
+              <!-- Restore JSON -->
+              <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
+                <div>
+                  <div class="font-bold text-xs text-slate-800">Pulihkan Data (JSON)</div>
+                  <p class="text-[11px] text-slate-500 mt-1">Unggah file backup JSON untuk mengembalikan data sebelumnya.</p>
+                </div>
+                <label class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-2 text-center">
+                  <i class="fa-solid fa-upload"></i> Unggah File Backup
+                  <input type="file" id="restore-file-input" onchange="restoreJSON(event)" accept=".json" class="hidden">
+                </label>
+              </div>
+
+              <!-- Reset Demo Data -->
+              <div class="bg-rose-50/60 p-4 rounded-xl border border-rose-200 flex flex-col justify-between">
+                <div>
+                  <div class="font-bold text-xs text-rose-900">Reset Data Demo</div>
+                  <p class="text-[11px] text-rose-700 mt-1">Kembalikan data ke kondisi standar demo awal sekolah.</p>
+                </div>
+                <button onclick="confirmResetDemo()" class="mt-4 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold py-2 px-3 rounded-lg transition flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-rotate"></i> Reset Data
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+
+  <!-- ==================== MODALS CONTAINER ==================== -->
+
+  <!-- 1. AGENDA FORM MODAL (ADD / EDIT) -->
+  <div id="modal-agenda" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
+        <h3 id="modal-agenda-title" class="font-bold text-sm flex items-center gap-2">
+          <i class="fa-solid fa-calendar-plus text-indigo-400"></i> Tambah Agenda Kegiatan
+        </h3>
+        <button onclick="closeAgendaModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="agenda-form" onsubmit="saveAgenda(event)" class="p-5 space-y-4 text-xs">
+        <input type="hidden" id="form-agenda-id">
+
+        <!-- Category Dropdown -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Kategori Agenda *</label>
+          <select id="form-agenda-category" onchange="handleFormCategoryChange()" required class="w-full p-2.5 rounded-lg border border-slate-300 bg-white font-medium focus:ring-2 focus:ring-indigo-500">
+            <option value="holiday">Hari Libur Nasional (Merah)</option>
+            <option value="school">Agenda Sekolah (Biru)</option>
+            <option value="teacher">Agenda Guru (Ungu)</option>
+            <option value="important">Peristiwa Penting (Oranye)</option>
+          </select>
+        </div>
+
+        <!-- Event Name -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nama Kegiatan / Agenda *</label>
+          <input type="text" id="form-agenda-name" required placeholder="Contoh: Rapat Evaluasi Pembelajaran" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <!-- Dates Grid -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tanggal Mulai *</label>
+            <input type="date" id="form-agenda-start" required class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tanggal Selesai *</label>
+            <input type="date" id="form-agenda-end" required class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <!-- Dynamic Additional Fields -->
+        <div id="form-extra-fields" class="space-y-3">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Waktu (Jam)</label>
+              <input type="text" id="form-agenda-time" placeholder="08:00 - 12:00 WIB" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tempat / Lokasi</label>
+              <input type="text" id="form-agenda-location" placeholder="Ruang Rapat / Aula" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Penanggung Jawab / Peserta</label>
+            <input type="text" id="form-agenda-pic" placeholder="Nama Guru / Panitia" class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <!-- Non Effective Toggle (For School Agenda) -->
+        <div id="form-noneffective-box" class="hidden bg-amber-50 p-3 rounded-lg border border-amber-200">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="form-agenda-noneffective" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+            <span class="font-semibold text-amber-900 text-xs">Tandai sebagai Hari Tidak Efektif Belajar (Mengurangi HEB)</span>
+          </label>
+        </div>
+
+        <!-- Description -->
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Keterangan / Catatan Tambahan</label>
+          <textarea id="form-agenda-desc" rows="2" placeholder="Catatan atau detail kegiatan..." class="w-full p-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <!-- Actions Footer -->
+        <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="closeAgendaModal()" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-semibold hover:bg-slate-100 transition">
+            Batal
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-sm">
+            Simpan Data
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- 2. DATE DETAIL MODAL (WHEN A CALENDAR DAY IS CLICKED) -->
+  <div id="modal-date-detail" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="bg-indigo-950 text-white px-5 py-4 flex items-center justify-between">
+        <div>
+          <h3 id="modal-date-title" class="font-bold text-base text-white">Detail Agenda</h3>
+          <p id="modal-date-sub" class="text-xs text-indigo-200">15 Juli 2024</p>
+        </div>
+        <button onclick="closeDateDetailModal()" class="text-slate-300 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div id="modal-date-events-list" class="space-y-3 max-h-72 overflow-y-auto pr-1">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+          <button id="modal-date-add-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-bold w-full transition shadow-sm flex items-center justify-center gap-2">
+            <i class="fa-solid fa-plus"></i> Tambah Kegiatan Pada Tanggal Ini
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 3. PRINT & PDF PREVIEW MODAL -->
+  <div id="modal-print-preview" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden">
+      <!-- Modal Top Header Bar -->
+      <div class="bg-slate-900 text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <i class="fa-solid fa-print text-indigo-400 text-lg"></i>
+          <div>
+            <h3 class="font-bold text-sm text-white">Pratinjau Cetak / Ekspor PDF</h3>
+            <p class="text-[11px] text-slate-400">Pengaturan tata letak dokumen cetak resmi</p>
+          </div>
+        </div>
+
+        <!-- Layout Controls -->
+        <div class="flex items-center gap-2 text-xs">
+          <select id="print-type-select" onchange="renderPrintDocument()" class="bg-slate-800 text-white border border-slate-700 rounded-lg p-1.5 focus:outline-none">
+            <option value="cal-sem1">Kalender Semester 1 (Ganjil)</option>
+            <option value="cal-sem2">Kalender Semester 2 (Genap)</option>
+            <option value="cal-annual">Kalender 1 Tahun Pelajaran</option>
+            <option value="rekap">Laporan Rekapitulasi Agenda</option>
+            <option value="heb">Laporan Hari Efektif Belajar</option>
+          </select>
+
+          <select id="print-paper-size" onchange="renderPrintDocument()" class="bg-slate-800 text-white border border-slate-700 rounded-lg p-1.5 focus:outline-none">
+            <option value="a4">Kertas A4</option>
+            <option value="f4">Kertas F4 / Folio</option>
+          </select>
+
+          <select id="print-orientation" onchange="renderPrintDocument()" class="bg-slate-800 text-white border border-slate-700 rounded-lg p-1.5 focus:outline-none">
+            <option value="landscape">Landscape (Mendatar)</option>
+            <option value="portrait">Portrait (Tegak)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="downloadPDFDocument()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-file-pdf"></i> Unduh PDF
+          </button>
+          <button onclick="triggerNativePrint()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-print"></i> Cetak
+          </button>
+          <button onclick="closePrintModal()" class="text-slate-400 hover:text-white p-1">
+            <i class="fa-solid fa-xmark text-xl"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Printable Document Preview Screen -->
+      <div class="flex-1 bg-slate-200 p-4 overflow-y-auto flex justify-center">
+        <!-- Printable Area Wrapper -->
+        <div id="print-area" class="bg-white shadow-xl p-8 rounded-sm text-slate-900 w-full max-w-[1000px] min-h-[700px] transition-all my-auto">
+          <!-- Populated by JS renderPrintDocument() -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 4. CUSTOM CONFIRMATION MODAL -->
+  <div id="modal-confirm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-sm overflow-hidden p-5 text-center">
+      <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-3 text-xl">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h3 id="confirm-title" class="font-bold text-slate-800 text-base mb-1">Konfirmasi Hapus</h3>
+      <p id="confirm-msg" class="text-xs text-slate-500 mb-5">Apakah Anda yakin ingin menghapus data ini? Tindakan tidak dapat dibatalkan.</p>
+      <div class="flex items-center justify-center gap-3">
+        <button id="confirm-cancel-btn" class="w-1/2 py-2 rounded-lg border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-100 transition">
+          Batal
+        </button>
+        <button id="confirm-ok-btn" class="w-1/2 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition">
+          Ya, Hapus
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 5. TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ==================== MAIN JAVASCRIPT LOGIC ==================== -->
+  <script>
+    /* ==================== GLOBAL APP STATE ==================== */
+    const STORAGE_KEY = 'KALDIK_APP_DATA_V1';
+
+    // Categories definition
+    const CATEGORIES = {
+      holiday: { id: 'holiday', name: 'Libur Nasional', color: 'rose', bgClass: 'bg-rose-500', textClass: 'text-rose-700', badgeClass: 'bg-rose-100 text-rose-800 border-rose-300' },
+      school: { id: 'school', name: 'Agenda Sekolah', color: 'sky', bgClass: 'bg-sky-500', textClass: 'text-sky-700', badgeClass: 'bg-sky-100 text-sky-800 border-sky-300' },
+      teacher: { id: 'teacher', name: 'Agenda Guru', color: 'purple', bgClass: 'bg-purple-500', textClass: 'text-purple-700', badgeClass: 'bg-purple-100 text-purple-800 border-purple-300' },
+      important: { id: 'important', name: 'Peristiwa Penting', color: 'amber', bgClass: 'bg-amber-500', textClass: 'text-amber-700', badgeClass: 'bg-amber-100 text-amber-800 border-amber-300' }
+    };
+
+    // Default Demo Data
+    const DEFAULT_SETTINGS = {
+      schoolName: "SD NEGERI HARAPAN BANGSA 01",
+      schoolNPSN: "20109988",
+      principalName: "Dr. H. Ahmad Dahlan, M.Pd.",
+      principalNIP: "19720512 199803 1 004",
+      address: "Jl. Pendidikan No. 45, Kecamatan Kota, Kabupaten Bandung",
+      academicYear: "2024/2025",
+      sem1Start: "2024-07-15",
+      sem1End: "2024-12-20",
+      sem2Start: "2025-01-06",
+      sem2End: "2025-06-20",
+      cityName: "Bandung",
+      developerRole: "Tim Pengembang Kurikulum",
+      developerName: "Panitia Kalender Pendidikan",
+      developerNIP: "",
+      signDate: "",
+      // Default SVG logos (Logo Kiri: Lambang Pemda, Logo Kanan: Lambang Sekolah/Pendidikan)
+      logoLeft: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 120' width='80' height='96'><path d='M50 5 L90 25 V65 C90 90 50 115 50 115 C50 115 10 90 10 65 V25 Z' fill='%231e3a8a' stroke='%23fbbf24' stroke-width='4'/><polygon points='50,25 57,40 73,40 60,50 65,66 50,55 35,66 40,50 27,40 43,40' fill='%23fbbf24'/><path d='M25 80 C40 95 60 95 75 80' stroke='%23ffffff' stroke-width='3' fill='none'/></svg>",
+      logoRight: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' width='80' height='80'><circle cx='50' cy='50' r='45' fill='%232563eb' stroke='%231d4ed8' stroke-width='3'/><path d='M25 60 Q50 45 75 60 V70 Q50 55 25 70 Z' fill='%23ffffff'/><path d='M50 35 L75 48 L50 60 L25 48 Z' fill='%23fbbf24'/><circle cx='50' cy='28' r='6' fill='%23fbbf24'/></svg>"
+    };
+
+    const DEMO_EVENTS = [
+      // Hari Libur Nasional
+      { id: 'ev-1', title: 'HUT Kemerdekaan RI ke-79', category: 'holiday', startDate: '2024-08-17', endDate: '2024-08-17', description: 'Libur Nasional Kemerdekaan Indonesia', isDemo: true },
+      { id: 'ev-2', title: 'Maulid Nabi Muhammad SAW', category: 'holiday', startDate: '2024-09-16', endDate: '2024-09-16', description: 'Libur Nasional Keagamaan', isDemo: true },
+      { id: 'ev-3', title: 'Hari Raya Natal', category: 'holiday', startDate: '2024-12-25', endDate: '2024-12-25', description: 'Libur Nasional Natal', isDemo: true },
+      { id: 'ev-4', title: 'Tahun Baru 2025 Masehi', category: 'holiday', startDate: '2025-01-01', endDate: '2025-01-01', description: 'Tahun Baru Masehi', isDemo: true },
+      { id: 'ev-5', title: 'Isra Mikraj Nabi Muhammad SAW', category: 'holiday', startDate: '2025-01-27', endDate: '2025-01-27', description: 'Libur Nasional Keagamaan', isDemo: true },
+      { id: 'ev-6', title: 'Tahun Baru Imlek 2576', category: 'holiday', startDate: '2025-01-29', endDate: '2025-01-29', description: 'Libur Imlek', isDemo: true },
+      { id: 'ev-7', title: 'Hari Raya Nyepi 1947 Saka', category: 'holiday', startDate: '2025-03-29', endDate: '2025-03-29', description: 'Libur Nyepi', isDemo: true },
+      { id: 'ev-8', title: 'Hari Raya Idul Fitri 1446 H', category: 'holiday', startDate: '2025-03-31', endDate: '2025-04-01', description: 'Libur Idul Fitri', isDemo: true },
+      { id: 'ev-9', title: 'Hari Buruh Internasional', category: 'holiday', startDate: '2025-05-01', endDate: '2025-05-01', description: 'May Day', isDemo: true },
+      { id: 'ev-10', title: 'Hari Raya Waisak 2569', category: 'holiday', startDate: '2025-05-12', endDate: '2025-05-12', description: 'Libur Waisak', isDemo: true },
+      { id: 'ev-11', title: 'Kenaikan Isa Almasih', category: 'holiday', startDate: '2025-05-29', endDate: '2025-05-29', description: 'Libur Keagamaan', isDemo: true },
+      { id: 'ev-12', title: 'Hari Lahir Pancasila', category: 'holiday', startDate: '2025-06-01', endDate: '2025-06-01', description: 'Hari Pancasila', isDemo: true },
+      { id: 'ev-13', title: 'Hari Raya Idul Adha 1446 H', category: 'holiday', startDate: '2025-06-07', endDate: '2025-06-07', description: 'Idul Adha', isDemo: true },
+
+      // Agenda Sekolah
+      { id: 'ev-14', title: 'Masa Pengenalan Lingkungan Sekolah (MPLS)', category: 'school', startDate: '2024-07-15', endDate: '2024-07-17', time: '07:30 - 11:30', location: 'Lapangan Sekolah', pic: 'Wakasek Kesiswaan', description: 'Pengenalan lingkungan bagi siswa baru SD', isNonEffective: true, isDemo: true },
+      { id: 'ev-15', title: 'Asesmen Nasional Berbasis Komputer (ANBK) SD', category: 'school', startDate: '2024-09-23', endDate: '2024-09-27', time: '08:00 - 12:00', location: 'Lab Komputer', pic: 'Tim IT & ANBK', description: 'Pelaksanaan ANBK Kelas 5', isNonEffective: false, isDemo: true },
+      { id: 'ev-16', title: 'Sumatif Akhir Semester 1 (SAS 1)', category: 'school', startDate: '2024-12-02', endDate: '2024-12-07', time: '07:30 - 11:00', location: 'Ruang Kelas 1-6', pic: 'Panitia Asesmen', description: 'Penilaian hasil belajar Semester 1', isNonEffective: false, isDemo: true },
+      { id: 'ev-17', title: 'Pembagian Rapor Semester 1', category: 'school', startDate: '2024-12-19', endDate: '2024-12-19', time: '08:00 - 11:30', location: 'Kelas Masing-masing', pic: 'Wali Kelas', description: 'Penyerahan Laporan Hasil Belajar ke Orang Tua', isNonEffective: false, isDemo: true },
+      { id: 'ev-18', title: 'Libur Semester 1 (Ganjil)', category: 'school', startDate: '2024-12-23', endDate: '2025-01-04', location: '-', pic: 'Sekolah', description: 'Libur pembelajaran akhir semester 1', isNonEffective: true, isDemo: true },
+      { id: 'ev-19', title: 'Sumatif Akhir Tahun (SAT) Semester 2', category: 'school', startDate: '2025-06-09', endDate: '2025-06-14', time: '07:30 - 11:00', location: 'Ruang Kelas 1-6', pic: 'Panitia Asesmen', description: 'Ujian Kenaikan Kelas', isNonEffective: false, isDemo: true },
+      { id: 'ev-20', title: 'Pembagian Rapor & Kenaikan Kelas', category: 'school', startDate: '2025-06-20', endDate: '2025-06-20', time: '08:00 - 11:30', location: 'Aula Utama', pic: 'Wali Kelas & Kepala Sekolah', description: 'Penyerahan Rapor Genap & Wisuda Kelas 6', isNonEffective: false, isDemo: true },
+      { id: 'ev-21', title: 'Libur Akhir Tahun Pelajaran', category: 'school', startDate: '2025-06-23', endDate: '2025-07-12', location: '-', pic: 'Sekolah', description: 'Libur akhir tahun pelajaran 2024/2025', isNonEffective: true, isDemo: true },
+
+      // Agenda Guru
+      { id: 'ev-22', title: 'Rapat Kerja Awal Tahun Pelajaran', category: 'teacher', startDate: '2024-07-12', endDate: '2024-07-12', time: '08:00 - 15:00', location: 'Ruang Guru', pic: 'Kepala Sekolah', description: 'Penyusunan Kurikulum Satuan Pendidikan (KSP) & Modul Ajar', isDemo: true },
+      { id: 'ev-23', title: 'Pelatihan Kombel & PMM Berdiferensiasi', category: 'teacher', startDate: '2024-08-14', endDate: '2024-08-14', time: '13:00 - 15:30', location: 'Ruang Multimedia', pic: 'Ketua Komunitas Belajar', description: 'Berbagi praktik baik pembelajaran berdiferensiasi', isDemo: true },
+      { id: 'ev-24', title: 'Workshop Penyusunan Soal HOTS SD', category: 'teacher', startDate: '2024-10-10', endDate: '2024-10-10', time: '08:30 - 14:00', location: 'Aula Sekolah', pic: 'Narasumber Dinas Pendidikan', description: 'Pelatihan pembuatan asesmen berbasis HOTS', isDemo: true },
+      { id: 'ev-25', title: 'Evaluasi Pembelajaran & Progam Sem 2', category: 'teacher', startDate: '2025-01-10', endDate: '2025-01-10', time: '13:00 - 15:30', location: 'Ruang Guru', pic: 'Kepala Sekolah', description: 'Rapat koordinasi dan evaluasi perangkat ajar', isDemo: true },
+
+      // Peristiwa Penting
+      { id: 'ev-26', title: 'Hari Anak Nasional', category: 'important', startDate: '2024-07-23', endDate: '2024-07-23', description: 'Peringatan Hari Anak Nasional di Sekolah', isDemo: true },
+      { id: 'ev-27', title: 'Hari Pramuka', category: 'important', startDate: '2024-08-14', endDate: '2024-08-14', description: 'Upacara Peringatan Hari Pramuka', isDemo: true },
+      { id: 'ev-28', title: 'Hari Batik Nasional', category: 'important', startDate: '2024-10-02', endDate: '2024-10-02', description: 'Seluruh warga sekolah mengenakan seragam batik', isDemo: true },
+      { id: 'ev-29', title: 'Hari Guru Nasional (HGN) & HUT PGRI', category: 'important', startDate: '2024-11-25', endDate: '2024-11-25', description: 'Upacara peringatan HGN dan apresiasi guru', isDemo: true },
+      { id: 'ev-30', title: 'Hari Pendidikan Nasional (Hardiknas)', category: 'important', startDate: '2025-05-02', endDate: '2025-05-02', description: 'Upacara Bendera Hardiknas', isDemo: true }
+    ];
+
+    // State Variables
+    let appData = {
+      settings: { ...DEFAULT_SETTINGS },
+      events: [...DEMO_EVENTS],
+      hebOverrides: {} // format: { '2024-07': 12 }
+    };
+
+    let activeTab = 'dashboard';
+    let activeSemester = 1; // 1 or 2
+    let currentCalendarDate = new Date(2024, 6, 1); // July 2024 default start
+    let calendarViewMode = 'month'; // 'month' or 'semester'
+
+    /* ==================== INITIALIZATION ==================== */
+    window.onload = function() {
+      loadDataFromStorage();
+      setupEventListeners();
+      switchTab('dashboard');
+      updateAllBadgesAndStats();
+    };
+
+    function loadDataFromStorage() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          appData = {
+            settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
+            events: parsed.events || [...DEMO_EVENTS],
+            hebOverrides: parsed.hebOverrides || {}
+          };
+        } else {
+          saveDataToStorage();
+        }
+      } catch (e) {
+        console.error('Error loading data:', e);
+      }
+      populateSettingsForm();
+    }
+
+    function saveDataToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+      } catch (e) {
+        console.error('Error saving data:', e);
+      }
+      updateAllBadgesAndStats();
+    }
+
+    /* ==================== TAB NAVIGATION ==================== */
+    function switchTab(tabId) {
+      activeTab = tabId;
+
+      // Update Nav Buttons
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('bg-indigo-600', 'text-white');
+        btn.classList.add('text-slate-300', 'hover:bg-slate-800');
+      });
+      const activeNavBtn = document.getElementById(`nav-${tabId}`);
+      if (activeNavBtn) {
+        activeNavBtn.classList.remove('text-slate-300', 'hover:bg-slate-800');
+        activeNavBtn.classList.add('bg-indigo-600', 'text-white');
+      }
+
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+      const activeSection = document.getElementById(`tab-${tabId}`);
+      if (activeSection) activeSection.classList.remove('hidden');
+
+      // Update Header Titles
+      const titles = {
+        'dashboard': ['Dashboard', 'Ringkasan Kalender Pendidikan & Agenda Sekolah'],
+        'kalender': ['Kalender Master', 'Tampilan Kalender Pendidikan Interaktif & Matriks Semester'],
+        'holidays': ['Hari Libur Nasional', 'Daftar Libur Resmi & Cuti Bersama Nasional'],
+        'school-agenda': ['Agenda Sekolah', 'Pengelolaan Kegiatan Akademik, Ujian & Libur Semester'],
+        'teacher-agenda': ['Agenda Guru', 'Jadwal Rapat, Kombel, Pelatihan & Pengembangan Guru'],
+        'events': ['Peristiwa Penting', 'Hari Besar Nasional & Momentum Penting Sekolah'],
+        'rekap': ['Rekap Agenda', 'Laporan & Rekapitulasi Seluruh Kegiatan Terfilter'],
+        'heb': ['Hari Efektif Belajar (HEB)', 'Kalkulasi Otomatis Hari Belajar Efektif Per Bulan & Semester'],
+        'settings': ['Pengaturan Aplikasi', 'Konfigurasi Profile Sekolah & Manajemen Data']
+      };
+      if (titles[tabId]) {
+        document.getElementById('page-title').innerText = titles[tabId][0];
+        document.getElementById('page-subtitle').innerText = titles[tabId][1];
+      }
+
+      // Trigger Render per Tab
+      if (tabId === 'dashboard') renderDashboard();
+      if (tabId === 'kalender') renderMasterCalendar();
+      if (tabId === 'holidays') renderCategoryTable('holiday');
+      if (tabId === 'school-agenda') renderCategoryTable('school');
+      if (tabId === 'teacher-agenda') renderCategoryTable('teacher');
+      if (tabId === 'events') renderCategoryTable('important');
+      if (tabId === 'rekap') renderRekapTable();
+      if (tabId === 'heb') renderHEBTab();
+      if (tabId === 'settings') populateSettingsForm();
+
+      // Close mobile menu if open
+      document.getElementById('nav-links').classList.add('hidden');
+    }
+
+    function toggleMobileMenu() {
+      const navLinks = document.getElementById('nav-links');
+      navLinks.classList.toggle('hidden');
+    }
+
+    function setActiveSemester(semNum) {
+      activeSemester = semNum;
+
+      document.getElementById('sem-btn-1').className = semNum === 1 
+        ? "px-3 py-1.5 rounded-md transition-all font-semibold bg-white text-indigo-600 shadow-sm"
+        : "px-3 py-1.5 rounded-md transition-all text-slate-600 hover:text-slate-900";
+      
+      document.getElementById('sem-btn-2').className = semNum === 2 
+        ? "px-3 py-1.5 rounded-md transition-all font-semibold bg-white text-indigo-600 shadow-sm"
+        : "px-3 py-1.5 rounded-md transition-all text-slate-600 hover:text-slate-900";
+
+      // Set calendar default month to start of selected semester
+      const semStart = semNum === 1 ? appData.settings.sem1Start : appData.settings.sem2Start;
+      if (semStart) {
+        const d = new Date(semStart);
+        currentCalendarDate = new Date(d.getFullYear(), d.getMonth(), 1);
+      }
+
+      showToast(`Semester ${semNum} diaktifkan`, 'info');
+      switchTab(activeTab);
+    }
+
+    /* ==================== STATS & BADGES ==================== */
+    function updateAllBadgesAndStats() {
+      // Sidebar Displays
+      document.getElementById('sidebar-tp-display').innerText = appData.settings.academicYear;
+      document.getElementById('sidebar-school-display').innerText = appData.settings.schoolName;
+
+      // Banner Displays
+      document.getElementById('banner-school-name').innerText = appData.settings.schoolName;
+      document.getElementById('banner-school-npsn').innerText = `NPSN: ${appData.settings.schoolNPSN}`;
+      document.getElementById('banner-school-address').innerText = appData.settings.address;
+      document.getElementById('banner-tp').innerText = appData.settings.academicYear;
+      document.getElementById('banner-sem').innerText = activeSemester === 1 ? 'Semester 1 (Ganjil)' : 'Semester 2 (Genap)';
+
+      // Dashboard Banner Logos
+      const bannerLeftBox = document.getElementById('banner-logo-left-box');
+      const bannerLeftImg = document.getElementById('banner-logo-left');
+      if (appData.settings.logoLeft) {
+        bannerLeftImg.src = appData.settings.logoLeft;
+        bannerLeftBox.classList.remove('hidden');
+      } else {
+        bannerLeftBox.classList.add('hidden');
+      }
+
+      const bannerRightBox = document.getElementById('banner-logo-right-box');
+      const bannerRightImg = document.getElementById('banner-logo-right');
+      if (appData.settings.logoRight) {
+        bannerRightImg.src = appData.settings.logoRight;
+        bannerRightBox.classList.remove('hidden');
+      } else {
+        bannerRightBox.classList.add('hidden');
+      }
+
+      // Category Counts
+      const counts = { holiday: 0, school: 0, teacher: 0, important: 0 };
+      appData.events.forEach(ev => {
+        if (counts[ev.category] !== undefined) counts[ev.category]++;
+      });
+
+      document.getElementById('badge-holidays').innerText = counts.holiday;
+      document.getElementById('badge-school').innerText = counts.school;
+      document.getElementById('badge-teacher').innerText = counts.teacher;
+      document.getElementById('badge-events').innerText = counts.important;
+
+      document.getElementById('stat-total-agenda').innerText = appData.events.length;
+      document.getElementById('stat-holidays').innerText = counts.holiday;
+      document.getElementById('stat-school').innerText = counts.school;
+      document.getElementById('stat-teacher').innerText = counts.teacher;
+      document.getElementById('stat-events').innerText = counts.important;
+
+      // HEB Active Semester Stats
+      const semHEB = calculateSemesterHEB(activeSemester);
+      document.getElementById('stat-heb-semester').innerText = semHEB.totalHEB;
+    }
+
+    /* ==================== DATE UTILITIES ==================== */
+    function getLocalDateString(d = new Date()) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function formatDateIndo(dateStr) {
+      if (!dateStr) return '-';
+      const [y, m, d] = dateStr.split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    function formatLongDateIndo(dateObjStr) {
+      const d = new Date(dateObjStr);
+      if (isNaN(d)) return dateObjStr;
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    }
+
+    function getMonthNameIndo(monthIdx) {
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      return months[monthIdx];
+    }
+
+    // Returns array of 'YYYY-MM-DD' strings for event range
+    function getDatesInRange(startStr, endStr) {
+      const dates = [];
+      let curr = new Date(startStr);
+      const end = new Date(endStr);
+      while (curr <= end) {
+        const y = curr.getFullYear();
+        const m = String(curr.getMonth() + 1).padStart(2, '0');
+        const d = String(curr.getDate()).padStart(2, '0');
+        dates.push(`${y}-${m}-${d}`);
+        curr.setDate(curr.getDate() + 1);
+      }
+      return dates;
+    }
+
+    function isDateInRange(targetDateStr, startStr, endStr) {
+      return targetDateStr >= startStr && targetDateStr <= endStr;
+    }
+
+    /* ==================== CALENDAR RENDERING ENGINE ==================== */
+    function renderDashboard() {
+      renderCalendarGrid('dashboard-calendar-container', currentCalendarDate);
+      renderTodayCard();
+      renderUpcomingAgendas();
+      updateAllBadgesAndStats();
+    }
+
+    function renderMasterCalendar() {
+      if (calendarViewMode === 'month') {
+        document.getElementById('full-month-header').classList.remove('hidden');
+        document.getElementById('full-cal-month-title').innerText = `${getMonthNameIndo(currentCalendarDate.getMonth())} ${currentCalendarDate.getFullYear()}`;
+        renderCalendarGrid('full-calendar-render-area', currentCalendarDate);
+      } else {
+        document.getElementById('full-month-header').classList.add('hidden');
+        renderSemesterMatrix('full-calendar-render-area', activeSemester);
+      }
+    }
+
+    function setCalendarMode(mode) {
+      calendarViewMode = mode;
+      document.getElementById('cal-mode-month').className = mode === 'month'
+        ? "px-3 py-1.5 rounded-md transition font-semibold bg-white text-indigo-600 shadow-sm"
+        : "px-3 py-1.5 rounded-md transition text-slate-600 hover:text-slate-900";
+      document.getElementById('cal-mode-semester').className = mode === 'semester'
+        ? "px-3 py-1.5 rounded-md transition font-semibold bg-white text-indigo-600 shadow-sm"
+        : "px-3 py-1.5 rounded-md transition text-slate-600 hover:text-slate-900";
+      renderMasterCalendar();
+    }
+
+    function navigateMonth(delta) {
+      currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
+      currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth(), 1);
+      if (activeTab === 'dashboard') renderDashboard();
+      if (activeTab === 'kalender') renderMasterCalendar();
+    }
+
+    function goToCurrentMonth() {
+      const now = new Date();
+      currentCalendarDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      if (activeTab === 'dashboard') renderDashboard();
+      if (activeTab === 'kalender') renderMasterCalendar();
+    }
+
+    function renderCalendarGrid(containerId, targetMonthDate) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      const year = targetMonthDate.getFullYear();
+      const month = targetMonthDate.getMonth();
+
+      // Update Month Title in Dashboard
+      const titleElem = document.getElementById('cal-month-title');
+      if (titleElem) titleElem.innerText = `${getMonthNameIndo(month)} ${year}`;
+
+      const tagElem = document.getElementById('cal-sem-tag');
+      if (tagElem) {
+        const isSem1 = month >= 6 && month <= 11; // Jul-Dec
+        tagElem.innerText = isSem1 ? 'Semester 1 (Ganjil)' : 'Semester 2 (Genap)';
+      }
+
+      // First day of month (0: Sun, 1: Mon, ...)
+      const firstDay = new Date(year, month, 1).getDay();
+      // Adjust for Monday first (Mon: 0, Tue: 1, ..., Sun: 6)
+      const startOffset = (firstDay + 6) % 7;
+      const totalDays = new Date(year, month + 1, 0).getDate();
+
+      const todayStr = getLocalDateString();
+
+      let html = `
+        <div class="grid grid-cols-7 border-t border-l border-slate-200 text-center font-semibold text-xs bg-slate-100 text-slate-700">
+          <div class="py-2 border-r border-b border-slate-200">Sen</div>
+          <div class="py-2 border-r border-b border-slate-200">Sel</div>
+          <div class="py-2 border-r border-b border-slate-200">Rab</div>
+          <div class="py-2 border-r border-b border-slate-200">Kam</div>
+          <div class="py-2 border-r border-b border-slate-200">Jum</div>
+          <div class="py-2 border-r border-b border-slate-200 text-rose-600">Sab</div>
+          <div class="py-2 border-r border-b border-slate-200 text-rose-600">Min</div>
+        </div>
+        <div class="grid grid-cols-7 border-l border-slate-200">
+      `;
+
+      // Previous month padding cells
+      for (let i = 0; i < startOffset; i++) {
+        html += `<div class="day-cell border-r border-b border-slate-200 bg-slate-50/50 p-1"></div>`;
+      }
+
+      // Month days
+      for (let day = 1; day <= totalDays; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayOfWeek = new Date(year, month, day).getDay(); // 0: Sun, 6: Sat
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const isToday = dateStr === todayStr;
+
+        // Get events for this date
+        const dayEvents = appData.events.filter(ev => isDateInRange(dateStr, ev.startDate, ev.endDate));
+        const hasHoliday = dayEvents.some(e => e.category === 'holiday');
+
+        let cellBgClass = 'bg-white hover:bg-slate-50';
+        if (hasHoliday || isWeekend) cellBgClass = 'bg-rose-50/30 hover:bg-rose-50/60';
+        if (isToday) cellBgClass = 'bg-indigo-50/70 hover:bg-indigo-100/70 ring-2 ring-indigo-500 ring-inset';
+
+        html += `
+          <div onclick="openDateDetailModal('${dateStr}')" class="day-cell border-r border-b border-slate-200 p-1.5 cursor-pointer transition flex flex-col justify-between ${cellBgClass}">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold ${isToday ? 'bg-indigo-600 text-white w-5 h-5 rounded-full flex items-center justify-center' : (isWeekend || hasHoliday ? 'text-rose-600' : 'text-slate-800')}">
+                ${day}
+              </span>
+              ${dayEvents.length > 0 ? `<span class="text-[10px] font-mono font-semibold px-1 rounded bg-slate-200 text-slate-700">${dayEvents.length}</span>` : ''}
+            </div>
+
+            <!-- Event Badges -->
+            <div class="space-y-1 overflow-hidden">
+        `;
+
+        // Render max 2 visible badges per day cell
+        const visibleEvents = dayEvents.slice(0, 2);
+        visibleEvents.forEach(ev => {
+          const cat = CATEGORIES[ev.category] || CATEGORIES.school;
+          html += `
+            <div class="text-[10px] leading-tight font-medium px-1.5 py-0.5 rounded truncate border ${cat.badgeClass}" title="${ev.title}">
+              ${ev.title}
+            </div>
+          `;
+        });
+
+        if (dayEvents.length > 2) {
+          html += `
+            <div class="text-[9px] text-slate-500 font-semibold px-1">
+              +${dayEvents.length - 2} lagi...
+            </div>
+          `;
+        }
+
+        html += `
+            </div>
+          </div>
+        `;
+      }
+
+      // Complete trailing cells
+      const totalCells = startOffset + totalDays;
+      const trailingCells = (7 - (totalCells % 7)) % 7;
+      for (let i = 0; i < trailingCells; i++) {
+        html += `<div class="day-cell border-r border-b border-slate-200 bg-slate-50/50 p-1"></div>`;
+      }
+
+      html += `</div>`;
+      container.innerHTML = html;
+    }
+
+    /* Render 6-month Semester Matrix for Kalender Master */
+    function renderSemesterMatrix(containerId, semesterNum) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      const semStart = semesterNum === 1 ? appData.settings.sem1Start : appData.settings.sem2Start;
+      const startYear = new Date(semStart).getFullYear();
+      
+      // Sem 1: Jul (6) to Dec (11)
+      // Sem 2: Jan (0) to Jun (5)
+      const months = semesterNum === 1 
+        ? [6, 7, 8, 9, 10, 11].map(m => ({ year: startYear, month: m }))
+        : [0, 1, 2, 3, 4, 5].map(m => ({ year: startYear + 1, month: m }));
+
+      let html = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">`;
+
+      months.forEach(item => {
+        const d = new Date(item.year, item.month, 1);
+        html += `
+          <div class="border border-slate-200 rounded-xl p-3 bg-white shadow-sm">
+            <h4 class="font-bold text-sm text-slate-800 text-center mb-3 bg-slate-100 py-1 rounded">
+              ${getMonthNameIndo(item.month)} ${item.year}
+            </h4>
+            <div id="mini-cal-${item.year}-${item.month}"></div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      container.innerHTML = html;
+
+      // Populate mini grids
+      months.forEach(item => {
+        renderMiniCalendar(`mini-cal-${item.year}-${item.month}`, item.year, item.month);
+      });
+    }
+
+    function renderMiniCalendar(containerId, year, month) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const startOffset = (firstDay + 6) % 7;
+      const totalDays = new Date(year, month + 1, 0).getDate();
+      const todayStr = getLocalDateString();
+
+      let html = `
+        <div class="grid grid-cols-7 text-center font-semibold text-[10px] text-slate-500 mb-1">
+          <div>S</div><div>S</div><div>R</div><div>K</div><div>J</div><div class="text-rose-500">S</div><div class="text-rose-500">M</div>
+        </div>
+        <div class="grid grid-cols-7 text-center text-xs gap-1">
+      `;
+
+      for (let i = 0; i < startOffset; i++) {
+        html += `<div></div>`;
+      }
+
+      for (let day = 1; day <= totalDays; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayOfWeek = new Date(year, month, day).getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const dayEvents = appData.events.filter(ev => isDateInRange(dateStr, ev.startDate, ev.endDate));
+        const hasHoliday = dayEvents.some(e => e.category === 'holiday');
+        const isToday = dateStr === todayStr;
+
+        let bgClass = 'text-slate-700';
+        if (hasHoliday || isWeekend) bgClass = 'text-rose-600 font-semibold bg-rose-50 rounded';
+        if (dayEvents.length > 0 && !hasHoliday) bgClass = 'bg-indigo-100 text-indigo-900 font-bold rounded';
+        if (isToday) bgClass = 'bg-indigo-600 text-white font-bold rounded-full';
+
+        html += `
+          <div onclick="openDateDetailModal('${dateStr}')" class="py-1 cursor-pointer hover:opacity-80 ${bgClass}" title="${dayEvents.map(e => e.title).join(', ')}">
+            ${day}
+          </div>
+        `;
+      }
+
+      html += `</div>`;
+      container.innerHTML = html;
+    }
+
+    /* ==================== TODAY & UPCOMING AGENDA WIDGETS ==================== */
+    function renderTodayCard() {
+      const today = new Date();
+      const todayStr = getLocalDateString(today);
+
+      document.getElementById('today-date-badge').innerText = formatDateIndo(todayStr);
+      document.getElementById('today-day-name').innerText = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][today.getDay()];
+      document.getElementById('today-full-text').innerText = `${today.getDate()} ${getMonthNameIndo(today.getMonth())} ${today.getFullYear()}`;
+
+      const todayEvents = appData.events.filter(ev => isDateInRange(todayStr, ev.startDate, ev.endDate));
+      const container = document.getElementById('today-activities-list');
+
+      if (todayEvents.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 italic">Tidak ada kegiatan terjadwal hari ini.</p>`;
+        return;
+      }
+
+      let html = '';
+      todayEvents.forEach(ev => {
+        const cat = CATEGORIES[ev.category] || CATEGORIES.school;
+        html += `
+          <div class="p-2 rounded-lg border text-xs ${cat.badgeClass} flex items-center justify-between">
+            <div>
+              <div class="font-bold">${ev.title}</div>
+              ${ev.time ? `<div class="text-[10px] opacity-80"><i class="fa-regular fa-clock mr-1"></i>${ev.time}</div>` : ''}
+            </div>
+            <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/70">${cat.name}</span>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    function renderUpcomingAgendas() {
+      const todayStr = getLocalDateString();
+      // Filter upcoming or ongoing
+      const upcoming = appData.events
+        .filter(ev => ev.endDate >= todayStr)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))
+        .slice(0, 5);
+
+      const container = document.getElementById('upcoming-agenda-list');
+
+      if (upcoming.length === 0) {
+        container.innerHTML = `<p class="text-xs text-slate-400 italic">Tidak ada agenda mendatang.</p>`;
+        return;
+      }
+
+      let html = '';
+      upcoming.forEach(ev => {
+        const cat = CATEGORIES[ev.category] || CATEGORIES.school;
+        html += `
+          <div class="p-2.5 rounded-xl border border-slate-100 bg-slate-50 flex items-start gap-3">
+            <div class="w-2 h-2 rounded-full ${cat.bgClass} mt-1.5 flex-shrink-0"></div>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs font-bold text-slate-800 truncate">${ev.title}</div>
+              <div class="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                <span><i class="fa-regular fa-calendar text-[10px] mr-1"></i>${formatDateIndo(ev.startDate)} ${ev.startDate !== ev.endDate ? `- ${formatDateIndo(ev.endDate)}` : ''}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    /* ==================== CATEGORY CRUD TABLES ==================== */
+    function renderCategoryTable(categoryKey) {
+      const filtered = appData.events
+        .filter(ev => ev.category === categoryKey)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+      const tbodyId = {
+        holiday: 'table-holidays-body',
+        school: 'table-school-body',
+        teacher: 'table-teacher-body',
+        important: 'table-events-body'
+      }[categoryKey];
+
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-xs text-slate-400 italic">Belum ada data kegiatan pada kategori ini.</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      filtered.forEach(ev => {
+        const dateRange = ev.startDate === ev.endDate ? formatDateIndo(ev.startDate) : `${formatDateIndo(ev.startDate)} s.d. ${formatDateIndo(ev.endDate)}`;
+        
+        if (categoryKey === 'holiday') {
+          const daysCount = getDatesInRange(ev.startDate, ev.endDate).length;
+          html += `
+            <tr class="hover:bg-slate-50 transition text-xs">
+              <td class="py-3 px-4 font-semibold text-rose-600">${dateRange}</td>
+              <td class="py-3 px-4 font-bold text-slate-800">${ev.title} ${ev.isDemo ? '<span class="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-mono ml-1">DEMO</span>' : ''}</td>
+              <td class="py-3 px-4 text-slate-500">${ev.description || '-'}</td>
+              <td class="py-3 px-4 text-center font-mono font-medium">${daysCount} Hari</td>
+              <td class="py-3 px-4 text-center">
+                <div class="flex items-center justify-center gap-2">
+                  <button onclick="openAgendaModal('${categoryKey}', '${ev.id}')" class="text-slate-600 hover:text-indigo-600 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                  <button onclick="confirmDeleteAgenda('${ev.id}')" class="text-slate-600 hover:text-rose-600 p-1"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </td>
+            </tr>
+          `;
+        } else if (categoryKey === 'school') {
+          html += `
+            <tr class="hover:bg-slate-50 transition text-xs">
+              <td class="py-3 px-4">
+                <div class="font-semibold text-sky-700">${dateRange}</div>
+                ${ev.time ? `<div class="text-[10px] text-slate-400">${ev.time}</div>` : ''}
+              </td>
+              <td class="py-3 px-4 font-bold text-slate-800">${ev.title} ${ev.isDemo ? '<span class="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-mono ml-1">DEMO</span>' : ''}</td>
+              <td class="py-3 px-4">
+                <div class="text-slate-700">${ev.location || '-'}</div>
+                <div class="text-[10px] text-slate-400">PIC: ${ev.pic || '-'}</div>
+              </td>
+              <td class="py-3 px-4">
+                ${ev.isNonEffective 
+                  ? '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-semibold text-[10px]">Tidak Efektif</span>' 
+                  : '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold text-[10px]">Hari Efektif</span>'}
+              </td>
+              <td class="py-3 px-4 text-center">
+                <div class="flex items-center justify-center gap-2">
+                  <button onclick="openAgendaModal('${categoryKey}', '${ev.id}')" class="text-slate-600 hover:text-indigo-600 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                  <button onclick="confirmDeleteAgenda('${ev.id}')" class="text-slate-600 hover:text-rose-600 p-1"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </td>
+            </tr>
+          `;
+        } else if (categoryKey === 'teacher') {
+          html += `
+            <tr class="hover:bg-slate-50 transition text-xs">
+              <td class="py-3 px-4">
+                <div class="font-semibold text-purple-700">${dateRange}</div>
+                ${ev.time ? `<div class="text-[10px] text-slate-400">${ev.time}</div>` : ''}
+              </td>
+              <td class="py-3 px-4 font-bold text-slate-800">${ev.title} ${ev.isDemo ? '<span class="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-mono ml-1">DEMO</span>' : ''}</td>
+              <td class="py-3 px-4 text-slate-600">${ev.pic || 'Seluruh Guru'}</td>
+              <td class="py-3 px-4 text-slate-600">${ev.location || '-'}</td>
+              <td class="py-3 px-4 text-center">
+                <div class="flex items-center justify-center gap-2">
+                  <button onclick="openAgendaModal('${categoryKey}', '${ev.id}')" class="text-slate-600 hover:text-indigo-600 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                  <button onclick="confirmDeleteAgenda('${ev.id}')" class="text-slate-600 hover:text-rose-600 p-1"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </td>
+            </tr>
+          `;
+        } else if (categoryKey === 'important') {
+          html += `
+            <tr class="hover:bg-slate-50 transition text-xs">
+              <td class="py-3 px-4 font-semibold text-amber-700">${dateRange}</td>
+              <td class="py-3 px-4 font-bold text-slate-800">${ev.title} ${ev.isDemo ? '<span class="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-mono ml-1">DEMO</span>' : ''}</td>
+              <td class="py-3 px-4 text-slate-500">${ev.description || '-'}</td>
+              <td class="py-3 px-4 text-center">
+                <div class="flex items-center justify-center gap-2">
+                  <button onclick="openAgendaModal('${categoryKey}', '${ev.id}')" class="text-slate-600 hover:text-indigo-600 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                  <button onclick="confirmDeleteAgenda('${ev.id}')" class="text-slate-600 hover:text-rose-600 p-1"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    /* ==================== REKAP TABLE & FILTERS ==================== */
+    function renderRekapTable() {
+      const catFilter = document.getElementById('rekap-filter-cat').value;
+      const semFilter = document.getElementById('rekap-filter-sem').value;
+      const monthFilter = document.getElementById('rekap-filter-month').value;
+      const searchKeyword = document.getElementById('rekap-search-input').value.toLowerCase().trim();
+
+      let filtered = [...appData.events];
+
+      // Category filter
+      if (catFilter !== 'all') {
+        filtered = filtered.filter(ev => ev.category === catFilter);
+      }
+
+      // Semester filter
+      if (semFilter !== 'all') {
+        const bounds = semFilter === '1' 
+          ? [appData.settings.sem1Start, appData.settings.sem1End] 
+          : [appData.settings.sem2Start, appData.settings.sem2End];
+        filtered = filtered.filter(ev => ev.startDate >= bounds[0] && ev.startDate <= bounds[1]);
+      }
+
+      // Month filter
+      if (monthFilter !== 'all') {
+        const mTarget = parseInt(monthFilter);
+        filtered = filtered.filter(ev => {
+          const d = new Date(ev.startDate);
+          return d.getMonth() === mTarget;
+        });
+      }
+
+      // Search keyword filter
+      if (searchKeyword) {
+        filtered = filtered.filter(ev => 
+          ev.title.toLowerCase().includes(searchKeyword) ||
+          (ev.description && ev.description.toLowerCase().includes(searchKeyword)) ||
+          (ev.pic && ev.pic.toLowerCase().includes(searchKeyword)) ||
+          (ev.location && ev.location.toLowerCase().includes(searchKeyword))
+        );
+      }
+
+      filtered.sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+      document.getElementById('rekap-count-display').innerText = filtered.length;
+      const tbody = document.getElementById('rekap-table-body');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-xs text-slate-400 italic">Tidak ada data agenda yang memenuhi kriteria filter.</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      filtered.forEach((ev, idx) => {
+        const cat = CATEGORIES[ev.category] || CATEGORIES.school;
+        const dateRange = ev.startDate === ev.endDate ? formatDateIndo(ev.startDate) : `${formatDateIndo(ev.startDate)} s.d. ${formatDateIndo(ev.endDate)}`;
+
+        html += `
+          <tr class="hover:bg-slate-50 transition text-xs">
+            <td class="py-3 px-4 font-mono text-slate-400">${idx + 1}</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${cat.badgeClass}">${cat.name}</span>
+            </td>
+            <td class="py-3 px-4">
+              <div class="font-bold text-slate-800">${dateRange}</div>
+              ${ev.time ? `<div class="text-[10px] text-slate-400">${ev.time}</div>` : ''}
+            </td>
+            <td class="py-3 px-4 font-bold text-slate-800">${ev.title}</td>
+            <td class="py-3 px-4">
+              <div>${ev.location || '-'}</div>
+              ${ev.pic ? `<div class="text-[10px] text-slate-400">PIC: ${ev.pic}</div>` : ''}
+            </td>
+            <td class="py-3 px-4 text-slate-600">${ev.description || '-'}</td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    function resetRekapFilters() {
+      document.getElementById('rekap-filter-cat').value = 'all';
+      document.getElementById('rekap-filter-sem').value = 'all';
+      document.getElementById('rekap-filter-month').value = 'all';
+      document.getElementById('rekap-search-input').value = '';
+      renderRekapTable();
+    }
+
+    /* ==================== HARI EFEKTIF BELAJAR (HEB) ENGINE ==================== */
+    function calculateMonthHEB(year, month) {
+      const sem1Start = appData.settings.sem1Start;
+      const sem1End = appData.settings.sem1End;
+      const sem2Start = appData.settings.sem2Start;
+      const sem2End = appData.settings.sem2End;
+
+      const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+      let workDaysCount = 0;
+      let holidayCount = 0;
+      let nonEffectiveSchoolDays = 0;
+
+      for (let day = 1; day <= totalDaysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        // Check if date falls within active school semester bounds
+        const inSem1 = isDateInRange(dateStr, sem1Start, sem1End);
+        const inSem2 = isDateInRange(dateStr, sem2Start, sem2End);
+
+        if (!inSem1 && !inSem2) continue; // Outside active academic periods
+
+        const dayOfWeek = new Date(year, month, day).getDay(); // 0: Sun, 6: Sat
+        const isWorkDay = dayOfWeek >= 1 && dayOfWeek <= 5; // Mon-Fri
+
+        if (isWorkDay) {
+          workDaysCount++;
+
+          // Check National Holidays
+          const isHoliday = appData.events.some(ev => ev.category === 'holiday' && isDateInRange(dateStr, ev.startDate, ev.endDate));
+          if (isHoliday) {
+            holidayCount++;
+            continue;
+          }
+
+          // Check Non-Effective School Agenda
+          const isNonEff = appData.events.some(ev => ev.category === 'school' && ev.isNonEffective && isDateInRange(dateStr, ev.startDate, ev.endDate));
+          if (isNonEff) {
+            nonEffectiveSchoolDays++;
+          }
+        }
+      }
+
+      const computedHEB = Math.max(0, workDaysCount - holidayCount - nonEffectiveSchoolDays);
+      const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+      const finalHEB = appData.hebOverrides[key] !== undefined ? appData.hebOverrides[key] : computedHEB;
+
+      return {
+        monthKey: key,
+        year,
+        month,
+        workDaysCount,
+        holidayCount,
+        nonEffectiveSchoolDays,
+        computedHEB,
+        finalHEB,
+        isOverridden: appData.hebOverrides[key] !== undefined
+      };
+    }
+
+    function calculateSemesterHEB(semesterNum) {
+      const semStart = semesterNum === 1 ? appData.settings.sem1Start : appData.settings.sem2Start;
+      const startYear = new Date(semStart).getFullYear();
+
+      // Sem 1: Jul to Dec | Sem 2: Jan to Jun
+      const months = semesterNum === 1 
+        ? [6, 7, 8, 9, 10, 11].map(m => ({ year: startYear, month: m }))
+        : [0, 1, 2, 3, 4, 5].map(m => ({ year: startYear + 1, month: m }));
+
+      let totalHEB = 0;
+      const monthlyBreakdown = months.map(m => {
+        const res = calculateMonthHEB(m.year, m.month);
+        totalHEB += res.finalHEB;
+        return res;
+      });
+
+      return { semesterNum, totalHEB, monthlyBreakdown };
+    }
+
+    function renderHEBTab() {
+      const sem1Data = calculateSemesterHEB(1);
+      const sem2Data = calculateSemesterHEB(2);
+
+      document.getElementById('heb-sem1-total-badge').innerText = `${sem1Data.totalHEB} Hari HEB`;
+      document.getElementById('heb-sem2-total-badge').innerText = `${sem2Data.totalHEB} Hari HEB`;
+
+      const annualTotal = sem1Data.totalHEB + sem2Data.totalHEB;
+      document.getElementById('heb-annual-total-display').innerText = `${annualTotal} Hari`;
+
+      // Render Tables
+      renderHEBTableBody('heb-sem1-body', sem1Data.monthlyBreakdown);
+      renderHEBTableBody('heb-sem2-body', sem2Data.monthlyBreakdown);
+    }
+
+    function renderHEBTableBody(tbodyId, breakdownList) {
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+
+      let html = '';
+      breakdownList.forEach(item => {
+        html += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-2.5 px-3 font-semibold text-slate-800">${getMonthNameIndo(item.month)} ${item.year}</td>
+            <td class="py-2.5 px-2 text-center text-slate-600 font-mono">${item.workDaysCount}</td>
+            <td class="py-2.5 px-2 text-center text-rose-600 font-mono font-medium">${item.holidayCount}</td>
+            <td class="py-2.5 px-2 text-center text-amber-600 font-mono font-medium">${item.nonEffectiveSchoolDays}</td>
+            <td class="py-2.5 px-3 text-center bg-indigo-50 font-bold text-indigo-900 font-mono text-sm">${item.finalHEB}</td>
+            <td class="py-2.5 px-2 text-center">
+              <input type="number" min="0" max="31" value="${item.finalHEB}" onchange="updateHEBOverride('${item.monthKey}', this.value)" class="w-14 text-center p-1 rounded border border-slate-300 focus:ring-1 focus:ring-indigo-500 text-xs font-mono">
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    function updateHEBOverride(monthKey, val) {
+      const num = parseInt(val);
+      if (!isNaN(num) && num >= 0) {
+        appData.hebOverrides[monthKey] = num;
+        saveDataToStorage();
+        renderHEBTab();
+        showToast(`Penyesuaian HEB untuk ${monthKey} disimpan`, 'success');
+      }
+    }
+
+    /* ==================== FORM MODAL LOGIC ==================== */
+    function openAgendaModal(categoryKey = 'holiday', editId = null) {
+      const modal = document.getElementById('modal-agenda');
+      const form = document.getElementById('agenda-form');
+      form.reset();
+
+      document.getElementById('form-agenda-id').value = '';
+      document.getElementById('form-agenda-category').value = categoryKey;
+      handleFormCategoryChange();
+
+      if (editId) {
+        const ev = appData.events.find(e => e.id === editId);
+        if (ev) {
+          document.getElementById('modal-agenda-title').innerText = 'Edit Agenda Kegiatan';
+          document.getElementById('form-agenda-id').value = ev.id;
+          document.getElementById('form-agenda-category').value = ev.category;
+          document.getElementById('form-agenda-name').value = ev.title;
+          document.getElementById('form-agenda-start').value = ev.startDate;
+          document.getElementById('form-agenda-end').value = ev.endDate;
+          document.getElementById('form-agenda-time').value = ev.time || '';
+          document.getElementById('form-agenda-location').value = ev.location || '';
+          document.getElementById('form-agenda-pic').value = ev.pic || '';
+          document.getElementById('form-agenda-desc').value = ev.description || '';
+          document.getElementById('form-agenda-noneffective').checked = !!ev.isNonEffective;
+          handleFormCategoryChange();
+        }
+      } else {
+        document.getElementById('modal-agenda-title').innerText = 'Tambah Agenda Kegiatan Baru';
+        // Set default dates to today
+        const today = getLocalDateString();
+        document.getElementById('form-agenda-start').value = today;
+        document.getElementById('form-agenda-end').value = today;
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeAgendaModal() {
+      document.getElementById('modal-agenda').classList.add('hidden');
+    }
+
+    function handleFormCategoryChange() {
+      const cat = document.getElementById('form-agenda-category').value;
+      const extraFields = document.getElementById('form-extra-fields');
+      const nonEffectiveBox = document.getElementById('form-noneffective-box');
+
+      if (cat === 'school') {
+        extraFields.classList.remove('hidden');
+        nonEffectiveBox.classList.remove('hidden');
+      } else if (cat === 'teacher') {
+        extraFields.classList.remove('hidden');
+        nonEffectiveBox.classList.add('hidden');
+      } else {
+        // Holiday or Important event
+        extraFields.classList.add('hidden');
+        nonEffectiveBox.classList.add('hidden');
+      }
+    }
+
+    function saveAgenda(e) {
+      e.preventDefault();
+
+      const editId = document.getElementById('form-agenda-id').value;
+      const category = document.getElementById('form-agenda-category').value;
+      const title = document.getElementById('form-agenda-name').value.trim();
+      const startDate = document.getElementById('form-agenda-start').value;
+      const endDate = document.getElementById('form-agenda-end').value;
+
+      if (startDate > endDate) {
+        showToast('Tanggal mulai tidak boleh lebih dari tanggal selesai', 'error');
+        return;
+      }
+
+      const agendaObj = {
+        id: editId || 'ev-' + Date.now(),
+        category,
+        title,
+        startDate,
+        endDate,
+        time: document.getElementById('form-agenda-time').value.trim(),
+        location: document.getElementById('form-agenda-location').value.trim(),
+        pic: document.getElementById('form-agenda-pic').value.trim(),
+        description: document.getElementById('form-agenda-desc').value.trim(),
+        isNonEffective: category === 'school' ? document.getElementById('form-agenda-noneffective').checked : false,
+        isDemo: false
+      };
+
+      if (editId) {
+        const idx = appData.events.findIndex(e => e.id === editId);
+        if (idx !== -1) appData.events[idx] = agendaObj;
+      } else {
+        appData.events.push(agendaObj);
+      }
+
+      saveDataToStorage();
+      closeAgendaModal();
+      showToast('Agenda berhasil disimpan!', 'success');
+      switchTab(activeTab);
+    }
+
+    function confirmDeleteAgenda(id) {
+      const ev = appData.events.find(e => e.id === id);
+      if (!ev) return;
+
+      openConfirmModal('Konfirmasi Hapus', `Apakah Anda yakin ingin menghapus agenda "${ev.title}"?`, () => {
+        appData.events = appData.events.filter(e => e.id !== id);
+        saveDataToStorage();
+        showToast('Agenda berhasil dihapus', 'info');
+        switchTab(activeTab);
+      });
+    }
+
+    /* ==================== DATE DETAIL CLICK MODAL ==================== */
+    function openDateDetailModal(dateStr) {
+      const modal = document.getElementById('modal-date-detail');
+      document.getElementById('modal-date-sub').innerText = formatLongDateIndo(dateStr);
+
+      const dayEvents = appData.events.filter(ev => isDateInRange(dateStr, ev.startDate, ev.endDate));
+      const listContainer = document.getElementById('modal-date-events-list');
+
+      if (dayEvents.length === 0) {
+        listContainer.innerHTML = `<p class="text-xs text-slate-400 italic text-center py-4">Tidak ada agenda pada tanggal ini.</p>`;
+      } else {
+        let html = '';
+        dayEvents.forEach(ev => {
+          const cat = CATEGORIES[ev.category] || CATEGORIES.school;
+          html += `
+            <div class="p-3 rounded-xl border text-xs ${cat.badgeClass} space-y-1 relative group">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-sm">${ev.title}</span>
+                <div class="flex items-center gap-1">
+                  <button onclick="openAgendaModal('${ev.category}', '${ev.id}')" class="text-slate-600 hover:text-indigo-600 p-1"><i class="fa-solid fa-pen"></i></button>
+                  <button onclick="confirmDeleteAgenda('${ev.id}')" class="text-slate-600 hover:text-rose-600 p-1"><i class="fa-solid fa-trash"></i></button>
+                </div>
+              </div>
+              ${ev.time ? `<div class="text-[11px]"><i class="fa-regular fa-clock mr-1"></i>${ev.time}</div>` : ''}
+              ${ev.location ? `<div class="text-[11px]"><i class="fa-solid fa-location-dot mr-1"></i>${ev.location}</div>` : ''}
+              ${ev.description ? `<div class="text-[11px] opacity-80 pt-1 border-t border-black/10">${ev.description}</div>` : ''}
+            </div>
+          `;
+        });
+        listContainer.innerHTML = html;
+      }
+
+      // Add event for this date button handler
+      const addBtn = document.getElementById('modal-date-add-btn');
+      addBtn.onclick = function() {
+        closeDateDetailModal();
+        openAgendaModal('school');
+        document.getElementById('form-agenda-start').value = dateStr;
+        document.getElementById('form-agenda-end').value = dateStr;
+      };
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeDateDetailModal() {
+      document.getElementById('modal-date-detail').classList.add('hidden');
+    }
+
+    /* ==================== SETTINGS & BACKUP/RESTORE ==================== */
+    function populateSettingsForm() {
+      const s = appData.settings;
+      document.getElementById('set-school-name').value = s.schoolName;
+      document.getElementById('set-school-npsn').value = s.schoolNPSN;
+      document.getElementById('set-principal-name').value = s.principalName;
+      document.getElementById('set-principal-nip').value = s.principalNIP;
+      document.getElementById('set-school-address').value = s.address;
+      document.getElementById('set-tp').value = s.academicYear;
+      document.getElementById('set-sem1-start').value = s.sem1Start;
+      document.getElementById('set-sem1-end').value = s.sem1End;
+      document.getElementById('set-sem2-start').value = s.sem2Start;
+      document.getElementById('set-sem2-end').value = s.sem2End;
+      document.getElementById('set-city-name').value = s.cityName || 'Bandung';
+      document.getElementById('set-dev-role').value = s.developerRole || 'Tim Pengembang Kurikulum';
+      document.getElementById('set-dev-name').value = s.developerName || 'Panitia Kalender Pendidikan';
+      document.getElementById('set-dev-nip').value = s.developerNIP || '';
+      document.getElementById('set-sign-date').value = s.signDate || '';
+
+      // Update Logo Previews in Settings Form
+      const imgLeft = document.getElementById('preview-logo-left');
+      if (s.logoLeft) {
+        imgLeft.src = s.logoLeft;
+        imgLeft.classList.remove('hidden');
+      } else {
+        imgLeft.src = '';
+        imgLeft.classList.add('hidden');
+      }
+
+      const imgRight = document.getElementById('preview-logo-right');
+      if (s.logoRight) {
+        imgRight.src = s.logoRight;
+        imgRight.classList.remove('hidden');
+      } else {
+        imgRight.src = '';
+        imgRight.classList.add('hidden');
+      }
+    }
+
+    function saveSettings(e) {
+      e.preventDefault();
+      appData.settings = {
+        ...appData.settings,
+        schoolName: document.getElementById('set-school-name').value.trim(),
+        schoolNPSN: document.getElementById('set-school-npsn').value.trim(),
+        principalName: document.getElementById('set-principal-name').value.trim(),
+        principalNIP: document.getElementById('set-principal-nip').value.trim(),
+        address: document.getElementById('set-school-address').value.trim(),
+        academicYear: document.getElementById('set-tp').value.trim(),
+        sem1Start: document.getElementById('set-sem1-start').value,
+        sem1End: document.getElementById('set-sem1-end').value,
+        sem2Start: document.getElementById('set-sem2-start').value,
+        sem2End: document.getElementById('set-sem2-end').value,
+        cityName: document.getElementById('set-city-name').value.trim(),
+        developerRole: document.getElementById('set-dev-role').value.trim(),
+        developerName: document.getElementById('set-dev-name').value.trim(),
+        developerNIP: document.getElementById('set-dev-nip').value.trim(),
+        signDate: document.getElementById('set-sign-date').value
+      };
+
+      saveDataToStorage();
+      showToast('Pengaturan sekolah & pengembang berhasil diperbarui', 'success');
+      switchTab(activeTab);
+    }
+
+    function backupJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `KALDIK_BACKUP_${appData.settings.academicYear.replace('/', '-')}_${getLocalDateString()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('File backup JSON berhasil diunduh', 'success');
+    }
+
+    function restoreJSON(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const parsed = JSON.parse(evt.target.result);
+          if (parsed.settings && parsed.events) {
+            appData = parsed;
+            saveDataToStorage();
+            showToast('Data berhasil dipulihkan dari backup!', 'success');
+            switchTab('dashboard');
+          } else {
+            showToast('Format file JSON backup tidak valid', 'error');
+          }
+        } catch (err) {
+          showToast('Gagal mebaca file JSON', 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function confirmResetDemo() {
+      openConfirmModal('Reset Data Demo', 'Apakah Anda yakin ingin mengembalikan seluruh data ke standar demo?', () => {
+        appData = {
+          settings: { ...DEFAULT_SETTINGS },
+          events: [...DEMO_EVENTS],
+          hebOverrides: {}
+        };
+        saveDataToStorage();
+        showToast('Data berhasil di-reset ke standar demo', 'info');
+        switchTab('dashboard');
+      });
+    }
+
+    /* ==================== EXCEL EXPORT (SHEETJS) ==================== */
+    function exportRekapExcel() {
+      if (typeof XLSX === 'undefined') {
+        showToast('Library Excel belum dimuat', 'error');
+        return;
+      }
+
+      const rows = [
+        ['REKAPITULASI KALENDER PENDIDIKAN & AGENDA SEKOLAH'],
+        [appData.settings.schoolName],
+        [`Tahun Pelajaran ${appData.settings.academicYear}`],
+        [''],
+        ['No', 'Kategori', 'Tanggal Mulai', 'Tanggal Selesai', 'Waktu', 'Nama Kegiatan / Agenda', 'Tempat / Lokasi', 'PIC / Penanggung Jawab', 'Keterangan']
+      ];
+
+      appData.events.forEach((ev, idx) => {
+        const catName = CATEGORIES[ev.category]?.name || ev.category;
+        rows.push([
+          idx + 1,
+          catName,
+          formatDateIndo(ev.startDate),
+          formatDateIndo(ev.endDate),
+          ev.time || '-',
+          ev.title,
+          ev.location || '-',
+          ev.pic || '-',
+          ev.description || '-'
+        ]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Rekap Agenda");
+
+      XLSX.writeFile(wb, `Rekap_Agenda_${appData.settings.academicYear.replace('/', '-')}.xlsx`);
+      showToast('Rekapitulasi Excel berhasil diunduh', 'success');
+    }
+
+    /* ==================== PRINT & PDF ENGINE ==================== */
+    function openPrintModal() {
+      document.getElementById('modal-print-preview').classList.remove('hidden');
+      renderPrintDocument();
+    }
+
+    function closePrintModal() {
+      document.getElementById('modal-print-preview').classList.add('hidden');
+    }
+
+    function renderPrintDocument() {
+      const type = document.getElementById('print-type-select').value;
+      const paperSize = document.getElementById('print-paper-size').value;
+      const orientation = document.getElementById('print-orientation').value;
+      const printArea = document.getElementById('print-area');
+
+      // Adjust preview container orientation style
+      if (orientation === 'landscape') {
+        printArea.style.maxWidth = '1050px';
+      } else {
+        printArea.style.maxWidth = '800px';
+      }
+
+      // Official Kop Surat Header (3 Columns: Logo Kiri - Text Utama Header - Logo Kanan)
+      const logoLeftHtml = appData.settings.logoLeft 
+        ? `<div class="w-20 h-20 flex-shrink-0 flex items-center justify-center"><img src="${appData.settings.logoLeft}" class="max-w-full max-h-full object-contain"></div>`
+        : `<div class="w-20 h-20 flex-shrink-0"></div>`;
+
+      const logoRightHtml = appData.settings.logoRight 
+        ? `<div class="w-20 h-20 flex-shrink-0 flex items-center justify-center"><img src="${appData.settings.logoRight}" class="max-w-full max-h-full object-contain"></div>`
+        : `<div class="w-20 h-20 flex-shrink-0"></div>`;
+
+      let contentHtml = `
+        <!-- Official Kop Surat Header -->
+        <div class="border-b-4 border-double border-slate-900 pb-3 mb-5 flex items-center justify-between gap-4">
+          ${logoLeftHtml}
+          <div class="text-center flex-1">
+            <h2 class="font-extrabold text-xl text-slate-900 tracking-wide uppercase leading-tight">${appData.settings.schoolName}</h2>
+            <p class="text-xs text-slate-700 mt-1">${appData.settings.address} | NPSN: ${appData.settings.schoolNPSN}</p>
+            <div class="mt-2 text-xs font-bold text-slate-800 uppercase tracking-wider bg-slate-100 py-1 px-3 rounded border border-slate-300 inline-block">
+              KALENDER PENDIDIKAN SEKOLAH DASAR (SD) - TAHUN PELAJARAN ${appData.settings.academicYear}
+            </div>
+          </div>
+          ${logoRightHtml}
+        </div>
+      `;
+
+      if (type === 'cal-sem1' || type === 'cal-sem2') {
+        const semNum = type === 'cal-sem1' ? 1 : 2;
+        contentHtml += renderPrintSemesterCalendar(semNum);
+      } else if (type === 'cal-annual') {
+        contentHtml += renderPrintSemesterCalendar(1);
+        contentHtml += `<div class="page-break my-6"></div>`;
+        contentHtml += renderPrintSemesterCalendar(2);
+      } else if (type === 'rekap') {
+        contentHtml += renderPrintRekapTable();
+      } else if (type === 'heb') {
+        contentHtml += renderPrintHEBTable();
+      }
+
+      // Official Signature Footer Block
+      const cityName = appData.settings.cityName || 'Bandung';
+      const devRole = appData.settings.developerRole || 'Tim Pengembang Kurikulum';
+      const devName = appData.settings.developerName || 'Panitia Kalender Pendidikan';
+      const devNipStr = appData.settings.developerNIP ? `NIP. ${appData.settings.developerNIP}` : '';
+      const signDateStr = appData.settings.signDate 
+        ? formatLongDateIndo(appData.settings.signDate) 
+        : formatLongDateIndo(getLocalDateString());
+
+      contentHtml += `
+        <div class="mt-10 pt-4 flex items-end justify-between text-xs text-slate-800">
+          <div>
+            <p>Mengetahui,</p>
+            <p class="font-bold">Kepala ${appData.settings.schoolName}</p>
+            <div class="h-16"></div>
+            <p class="font-bold underline">${appData.settings.principalName}</p>
+            <p class="text-[11px] text-slate-600">NIP. ${appData.settings.principalNIP || '-'}</p>
+          </div>
+          <div class="text-right">
+            <p>Ditetapkan di ${cityName}, ${signDateStr}</p>
+            <p class="font-bold">${devRole}</p>
+            <div class="h-16"></div>
+            <p class="font-bold underline">${devName}</p>
+            <p class="text-[11px] text-slate-600">${devNipStr}</p>
+          </div>
+        </div>
+      `;
+
+      printArea.innerHTML = contentHtml;
+    }
+
+    function renderPrintSemesterCalendar(semesterNum) {
+      const semStart = semesterNum === 1 ? appData.settings.sem1Start : appData.settings.sem2Start;
+      const startYear = new Date(semStart).getFullYear();
+      const months = semesterNum === 1 
+        ? [6, 7, 8, 9, 10, 11].map(m => ({ year: startYear, month: m }))
+        : [0, 1, 2, 3, 4, 5].map(m => ({ year: startYear + 1, month: m }));
+
+      let html = `
+        <div class="mb-4">
+          <h3 class="font-bold text-sm text-slate-900 border-b border-slate-300 pb-1">
+            TAMPILAN KALENDER SEMESTER ${semesterNum} (${semesterNum === 1 ? 'GANJIL' : 'GENAP'})
+          </h3>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 mb-4">
+      `;
+
+      months.forEach(item => {
+        const year = item.year;
+        const month = item.month;
+        const firstDay = new Date(year, month, 1).getDay();
+        const startOffset = (firstDay + 6) % 7;
+        const totalDays = new Date(year, month + 1, 0).getDate();
+
+        html += `
+          <div class="border border-slate-300 rounded p-1.5 text-[10px]">
+            <div class="font-bold text-center bg-slate-200 py-0.5 rounded text-slate-900 mb-1">
+              ${getMonthNameIndo(month)} ${year}
+            </div>
+            <div class="grid grid-cols-7 text-center font-bold text-[9px] border-b border-slate-200 mb-0.5">
+              <span>S</span><span>S</span><span>R</span><span>K</span><span>J</span><span class="text-rose-600">S</span><span class="text-rose-600">M</span>
+            </div>
+            <div class="grid grid-cols-7 text-center leading-tight gap-0.5">
+        `;
+
+        for (let i = 0; i < startOffset; i++) html += `<div></div>`;
+
+        for (let day = 1; day <= totalDays; day++) {
+          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const dayOfWeek = new Date(year, month, day).getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          const dayEvents = appData.events.filter(ev => isDateInRange(dateStr, ev.startDate, ev.endDate));
+          const hasHoliday = dayEvents.some(e => e.category === 'holiday');
+
+          let bgStyle = '';
+          if (hasHoliday || isWeekend) bgStyle = 'bg-rose-100 text-rose-800 font-bold';
+          else if (dayEvents.length > 0) bgStyle = 'bg-sky-200 text-sky-900 font-bold';
+
+          html += `<div class="py-0.5 rounded ${bgStyle}">${day}</div>`;
+        }
+
+        html += `</div></div>`;
+      });
+
+      html += `</div>`;
+
+      // Printable Events Legend Key
+      html += `
+        <div class="border border-slate-300 rounded p-3 text-xs mb-4">
+          <div class="font-bold text-slate-800 mb-1">Daftar Agenda & Libur Semester ${semesterNum}:</div>
+          <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+      `;
+
+      const semEvents = appData.events.filter(ev => {
+        const bounds = semesterNum === 1 ? [appData.settings.sem1Start, appData.settings.sem1End] : [appData.settings.sem2Start, appData.settings.sem2End];
+        return isDateInRange(ev.startDate, bounds[0], bounds[1]);
+      }).sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+      semEvents.forEach(ev => {
+        const cat = CATEGORIES[ev.category] || CATEGORIES.school;
+        html += `
+          <div class="flex items-start gap-1.5">
+            <span class="w-2 h-2 rounded-full ${cat.bgClass} mt-1 flex-shrink-0"></span>
+            <div>
+              <span class="font-bold text-slate-900">${formatDateIndo(ev.startDate)}:</span>
+              <span class="text-slate-700">${ev.title}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `</div></div>`;
+      return html;
+    }
+
+    function renderPrintRekapTable() {
+      let html = `
+        <h3 class="font-bold text-sm text-slate-900 border-b border-slate-300 pb-1 mb-3">REKAPITULASI AGENDA SEKOLAH</h3>
+        <table class="w-full text-left border-collapse text-xs mb-4">
+          <thead>
+            <tr class="bg-slate-200 text-slate-900 uppercase font-bold border border-slate-300">
+              <th class="p-2 border border-slate-300">No</th>
+              <th class="p-2 border border-slate-300">Kategori</th>
+              <th class="p-2 border border-slate-300">Tanggal</th>
+              <th class="p-2 border border-slate-300">Nama Agenda</th>
+              <th class="p-2 border border-slate-300">Lokasi / PIC</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      appData.events.sort((a, b) => a.startDate.localeCompare(b.startDate)).forEach((ev, idx) => {
+        const cat = CATEGORIES[ev.category] || CATEGORIES.school;
+        const dateRange = ev.startDate === ev.endDate ? formatDateIndo(ev.startDate) : `${formatDateIndo(ev.startDate)} - ${formatDateIndo(ev.endDate)}`;
+        html += `
+          <tr class="border border-slate-300">
+            <td class="p-2 border border-slate-300 text-center font-mono">${idx + 1}</td>
+            <td class="p-2 border border-slate-300 font-bold">${cat.name}</td>
+            <td class="p-2 border border-slate-300">${dateRange}</td>
+            <td class="p-2 border border-slate-300 font-semibold">${ev.title}</td>
+            <td class="p-2 border border-slate-300">${ev.location || '-'} / ${ev.pic || '-'}</td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      return html;
+    }
+
+    function renderPrintHEBTable() {
+      const sem1 = calculateSemesterHEB(1);
+      const sem2 = calculateSemesterHEB(2);
+
+      let html = `
+        <h3 class="font-bold text-sm text-slate-900 border-b border-slate-300 pb-1 mb-3">LAPORAN ANALISIS HARI EFEKTIF BELAJAR (HEB)</h3>
+        
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <h4 class="font-bold text-xs bg-slate-200 p-1.5 text-center">Semester 1 (Ganjil)</h4>
+            <table class="w-full text-left border-collapse text-xs border border-slate-300">
+              <thead>
+                <tr class="bg-slate-100 font-bold border-b border-slate-300">
+                  <th class="p-1.5">Bulan</th>
+                  <th class="p-1.5 text-center">Hari Kerja</th>
+                  <th class="p-1.5 text-center">Libur</th>
+                  <th class="p-1.5 text-center font-bold bg-slate-200">HEB</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      sem1.monthlyBreakdown.forEach(m => {
+        html += `
+          <tr class="border-b border-slate-200">
+            <td class="p-1.5 font-medium">${getMonthNameIndo(m.month)} ${m.year}</td>
+            <td class="p-1.5 text-center font-mono">${m.workDaysCount}</td>
+            <td class="p-1.5 text-center font-mono">${m.holidayCount + m.nonEffectiveSchoolDays}</td>
+            <td class="p-1.5 text-center font-bold font-mono bg-slate-50">${m.finalHEB}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+                <tr class="font-bold bg-slate-200">
+                  <td class="p-1.5">Total HEB Sem 1</td>
+                  <td colspan="3" class="p-1.5 text-center font-mono text-sm">${sem1.totalHEB} Hari</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <h4 class="font-bold text-xs bg-slate-200 p-1.5 text-center">Semester 2 (Genap)</h4>
+            <table class="w-full text-left border-collapse text-xs border border-slate-300">
+              <thead>
+                <tr class="bg-slate-100 font-bold border-b border-slate-300">
+                  <th class="p-1.5">Bulan</th>
+                  <th class="p-1.5 text-center">Hari Kerja</th>
+                  <th class="p-1.5 text-center">Libur</th>
+                  <th class="p-1.5 text-center font-bold bg-slate-200">HEB</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      sem2.monthlyBreakdown.forEach(m => {
+        html += `
+          <tr class="border-b border-slate-200">
+            <td class="p-1.5 font-medium">${getMonthNameIndo(m.month)} ${m.year}</td>
+            <td class="p-1.5 text-center font-mono">${m.workDaysCount}</td>
+            <td class="p-1.5 text-center font-mono">${m.holidayCount + m.nonEffectiveSchoolDays}</td>
+            <td class="p-1.5 text-center font-bold font-mono bg-slate-50">${m.finalHEB}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+                <tr class="font-bold bg-slate-200">
+                  <td class="p-1.5">Total HEB Sem 2</td>
+                  <td colspan="3" class="p-1.5 text-center font-mono text-sm">${sem2.totalHEB} Hari</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 text-white p-3 rounded flex justify-between items-center text-xs font-bold mb-4">
+          <span>TOTAL HARI EFEKTIF BELAJAR (HEB) 1 TAHUN PELAJARAN:</span>
+          <span class="text-base text-emerald-400 font-mono">${sem1.totalHEB + sem2.totalHEB} HARI</span>
+        </div>
+      `;
+
+      return html;
+    }
+
+    function triggerNativePrint() {
+      window.print();
+    }
+
+    function downloadPDFDocument() {
+      if (typeof html2pdf === 'undefined') {
+        showToast('Library html2pdf belum dimuat', 'error');
+        return;
+      }
+
+      const element = document.getElementById('print-area');
+      const orientation = document.getElementById('print-orientation').value;
+      const paperSize = document.getElementById('print-paper-size').value;
+
+      const opt = {
+        margin: 10,
+        filename: `KALDIK_${appData.settings.academicYear.replace('/', '-')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: paperSize === 'f4' ? [215.9, 330] : 'a4', orientation: orientation }
+      };
+
+      showToast('Memproses berkas PDF...', 'info');
+      html2pdf().set(opt).from(element).save().then(() => {
+        showToast('PDF berhasil diunduh!', 'success');
+      });
+    }
+
+    function printRekapReport() {
+      openPrintModal();
+      document.getElementById('print-type-select').value = 'rekap';
+      renderPrintDocument();
+    }
+
+    function printHEBReport() {
+      openPrintModal();
+      document.getElementById('print-type-select').value = 'heb';
+      renderPrintDocument();
+    }
+
+    /* ==================== CONFIRM MODAL HELPER ==================== */
+    function openConfirmModal(title, msg, onOk) {
+      document.getElementById('confirm-title').innerText = title;
+      document.getElementById('confirm-msg').innerText = msg;
+      const modal = document.getElementById('modal-confirm');
+
+      document.getElementById('confirm-ok-btn').onclick = function() {
+        onOk();
+        modal.classList.add('hidden');
+      };
+      document.getElementById('confirm-cancel-btn').onclick = function() {
+        modal.classList.add('hidden');
+      };
+
+      modal.classList.remove('hidden');
+    }
+
+    /* ==================== TOAST NOTIFICATION HELPER ==================== */
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+
+      const bgMap = {
+        success: 'bg-emerald-600 text-white',
+        error: 'bg-rose-600 text-white',
+        info: 'bg-slate-800 text-white'
+      };
+
+      toast.className = `px-4 py-2.5 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2 border border-white/20 transition-all transform translate-y-2 opacity-0 pointer-events-auto ${bgMap[type] || bgMap.info}`;
+      toast.innerHTML = `
+        <i class="fa-solid ${type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info')}"></i>
+        <span>${msg}</span>
+      `;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    function setupEventListeners() {
+      // Mobile drawer toggle
+      document.getElementById('mobile-menu-toggle').onclick = toggleMobileMenu;
+    }
+  </script>
+</body>
+</html>
